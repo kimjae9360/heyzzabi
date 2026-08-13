@@ -6,7 +6,7 @@ const ACTIVE_STATUSES = ['PENDING_DISTRIBUTION', 'TODO', 'IN_PROGRESS', 'REVIEW'
 
 export interface GlobalSearchResult {
   answer: string;
-  sources: { sourceType: string; sourceId: string; title: string }[];
+  sources: { sourceType: string; sourceId: string; title: string; category: string | null; score: number }[];
 }
 
 export async function answerGlobalQuery(query: string): Promise<GlobalSearchResult> {
@@ -41,6 +41,6 @@ export async function answerGlobalQuery(query: string): Promise<GlobalSearchResu
 
   return {
     answer: result.answer,
-    sources: relevant.map((h) => ({ sourceType: h.sourceType, sourceId: h.sourceId, title: h.title })),
+    sources: relevant.map((h) => ({ sourceType: h.sourceType, sourceId: h.sourceId, title: h.title, category: h.category, score: h.score })),
   };
 }

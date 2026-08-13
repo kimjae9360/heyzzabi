@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { searchKnowledge } from '@/lib/knowledgeIndex';
-import { answerFromContext, AIConfigError } from '@/lib/openai';
+import { answerGlobalQuery } from '@/lib/globalSearch';
+import { AIConfigError } from '@/lib/openai';
 import { getActingUser } from '@/lib/currentUser';
 
 interface ChatSource {
@@ -47,17 +47,16 @@ export async function POST(request: NextRequest) {
     }
     const user = await getActingUser(request);
 
-    const hits = await searchKnowledge(body.query, 5);
-    const relevant = hits.filter((h) => h.score > 0.15);
-    const result = await answerFromContext(body.query, relevant);
-    const sources = relevant.map((h) => ({ sourceType: h.sourceType, sourceId: h.sourceId, title: h.title, category: h.category, score: h.score }));
+    // 회의록/기획서 RAG 검색뿐 아니라 직원 워크로드/업무 현황(구조화 데이터)도 함께 근거로 삼는다 -
+    // "박서버에 대한 내용을 알려줘" 같은 질문은 문서 임베딩만으로는 답할 수 없다.
+    const { answer, sources } = await answerGlobalQuery(body.query);
 
     await prisma.chatMessage.create({ data: { role: 'user', content: body.query, user_id: user.user_id } });
     await prisma.chatMessage.create({
-      data: { role: 'assistant', content: result.answer, sources_json: JSON.stringify(sources), user_id: user.user_id },
+      data: { role: 'assistant', content: answer, sources_json: JSON.stringify(sources), user_id: user.user_id },
     });
 
-    return NextResponse.json({ answer: result.answer, sources });
+    return NextResponse.json({ answer, sources });
   } catch (err) {
     if (err instanceof AIConfigError) return NextResponse.json({ error: err.message }, { status: 400 });
     return NextResponse.json({ error: err instanceof Error ? err.message : '질의에 실패했습니다.' }, { status: 500 });
