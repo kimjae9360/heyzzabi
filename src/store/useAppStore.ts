@@ -1,6 +1,71 @@
 import { create } from 'zustand';
-import { apiMeetings, apiSpecs, apiTasks } from '../lib/api';
-import { generateProposalPPT } from '../lib/pptGenerator';
+import { generateProposalPPT } from '@/lib/pptGenerator';
+
+export type EmployeeStatus = 'ACTIVE' | 'LEAVE' | 'RESIGNED' | 'LOCKED';
+
+export interface Employee {
+  id: string;
+  employeeNo: string;
+  name: string;
+  email: string;
+  phone?: string;
+  department: string;
+  position: string;
+  role: string; // 직무
+  level: 'member' | 'lead' | 'pm'; // 시스템 권한
+  status: EmployeeStatus;
+  hireDate?: string;
+  profileImage?: string;
+  lastLoginAt?: string;
+  skills?: string[];
+  certifications?: string[];
+  pastProjects?: string[];
+  currentWorkload: number;
+  avatar: string;
+  createdAt: string;
+}
+
+export interface StructuredAnalysis {
+  agenda: string[];
+  decisions: string[];
+  actionItems: string[];
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  meetingDateIso: string;
+  summary: string[];
+  analysis?: StructuredAnalysis;
+
+  hasProposal: boolean;
+  proposalContent?: string;
+  isProposalApproved: boolean;
+  isProposalRejected: boolean;
+  proposalRejectedReason?: string;
+
+  isTasksExtracted: boolean;
+}
+
+export type TaskUiStatus = 'pending-distribution' | 'in-progress' | 'delayed' | 'shipped';
+
+export interface Task {
+  id: string;
+  title: string;
+  source: string;
+  estimatedHours?: number;
+  difficulty?: 'High' | 'Medium' | 'Low';
+  status: TaskUiStatus;
+  assigneeId?: string;
+  progress?: number;
+  delayReason?: string;
+  rejectedReason?: string;
+  completedAt?: string;
+  completedAtIso?: string;
+  createdAtIso: string;
+  dueDate?: string;
+}
 
 export interface Notification {
   id: string;
@@ -11,66 +76,31 @@ export interface Notification {
   link?: string;
 }
 
-export interface StructuredAnalysis {
-  agenda: string[];       // 안건
-  decisions: string[];    // 결정사항
-  actionItems: string[];  // 액션아이템
-}
+const DB_TASK_STATUS_TO_UI: Record<string, TaskUiStatus | null> = {
+  PENDING_DISTRIBUTION: 'pending-distribution',
+  TODO: 'pending-distribution',
+  IN_PROGRESS: 'in-progress',
+  REVIEW: 'in-progress',
+  DELAYED: 'delayed',
+  DONE: 'shipped',
+  CANCELLED: null, // 칸반에서 제외
+};
 
-export interface Meeting {
-  id: string;
-  title: string;
-  date: string;
-  summary: string[];        // raw STT content
-  analysis?: StructuredAnalysis; // AI structured extraction
-
-  hasProposal: boolean;
-  proposalContent?: string;
-  isProposalApproved: boolean;
-  isProposalRejected: boolean;
-  proposalRejectedReason?: string;
-
-  isTasksExtracted: boolean;
-  extractedTasks: string[];
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  source: string;
-  estimatedHours?: number;
-  difficulty?: 'High' | 'Medium' | 'Low';
-  status: 'pending-distribution' | 'in-progress' | 'delayed' | 'shipped';
-  assigneeId?: string;
-  progress?: number;
-  delayReason?: string;
-  rejectedReason?: string;   // set when distribution was rejected
-  completedAt?: string;
-  dueDate?: string;
-}
-
-export type EmployeeStatus = 'ACTIVE' | 'LEAVE' | 'RESIGNED' | 'LOCKED';
-
-export interface Employee {
-  id: string;               // user_id / 사번
-  employeeNo: string;       // 사원번호
-  name: string;
-  email: string;            // 회사 이메일
-  phone?: string;           // 연락처
-  department: string;       // 부서 (department_id)
-  position: string;         // 직급 (position_id) - 사원/대리/과장/부장 등
-  role: string;             // 직무 - Frontend/Backend/Designer/PM 등
-  level: 'member' | 'lead' | 'pm'; // 시스템 권한 (role) - 직원/팀장/관리자
-  status: EmployeeStatus;   // 계정 상태
-  hireDate?: string;        // 입사일
-  profileImage?: string;    // 프로필 이미지
-  lastLoginAt?: string;     // 최근 로그인
-  skills?: string[];        // 기술 스택 (stack)
-  certifications?: string[];
-  pastProjects?: string[];
-  currentWorkload: number;
-  avatar: string;
-  createdAt: string;        // 가입일
+async function apiFetch<T>(url: string, options: RequestInit = {}, activeUserId?: string | null): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(activeUserId ? { 'x-user-id': activeUserId } : {}),
+      ...options.headers,
+    },
+  });
+  const isJson = response.headers.get('content-type')?.includes('application/json');
+  const body = isJson ? await response.json().catch(() => null) : null;
+  if (!response.ok) {
+    throw new Error((body && body.error) || `요청에 실패했습니다. (${response.status})`);
+  }
+  return body as T;
 }
 
 interface AppState {
@@ -79,513 +109,301 @@ interface AppState {
   employees: Employee[];
   notifications: Notification[];
 
-  // toast notification (temporary)
+  activeUserId: string | null;
+  setActiveUser: (id: string) => void;
+
+  loading: boolean;
   toast: { message: string; type: 'success' | 'info' | 'warning' | 'error' } | null;
-  // Sync API
+
   fetchData: () => Promise<void>;
 
   // Meetings
-  addMeeting: (meeting: Omit<Meeting, 'id' | 'hasProposal' | 'isProposalApproved' | 'isProposalRejected' | 'isTasksExtracted' | 'extractedTasks'>) => Promise<void>;
-  deleteMeeting: (meetingId: string) => void;
+  addMeeting: (data: { title: string; content: string }) => Promise<void>;
+  deleteMeeting: (meetingId: string) => Promise<void>;
 
-  // Pipeline phase 1: Meeting → Proposal
+  // Pipeline phase 1: Meeting -> Proposal (real AI call)
   generateProposal: (meetingId: string) => Promise<void>;
-  editProposal: (meetingId: string, content: string) => void;
+  editProposal: (meetingId: string, content: string) => Promise<void>;
   approveProposalAndExtractTasks: (meetingId: string) => Promise<void>;
-  rejectProposal: (meetingId: string, reason: string) => void;
+  rejectProposal: (meetingId: string, reason: string) => Promise<void>;
   downloadPPT: (meetingId: string) => Promise<void>;
 
-  // Pipeline phase 2: Proposal → Distribution
-  approveDistribution: (taskId: string, newAssigneeId: string) => Promise<void>;
-  rejectDistribution: (taskId: string, reason: string) => void;
+  // Pipeline phase 2: Proposal -> Distribution
+  approveDistribution: (taskId: string, assigneeId: string) => Promise<void>;
+  rejectDistribution: (taskId: string, reason: string) => Promise<void>;
 
-  // Pipeline phase 3/4: In-progress → Shipped
-  reportDelay: (taskId: string, reason: string) => void;
-  reallocateTask: (taskId: string) => void;
-  updateTaskStatus: (taskId: string, status: Task['status']) => void;
-  updateTaskProgress: (taskId: string, progress: number) => void;
+  // Pipeline phase 3/4
+  reportDelay: (taskId: string, reason: string) => Promise<void>;
+  reallocateTask: (taskId: string) => Promise<void>;
+  updateTaskStatus: (taskId: string, status: TaskUiStatus) => Promise<void>;
+  updateTaskProgress: (taskId: string, progress: number) => Promise<void>;
 
   // Employees
-  addEmployee: (emp: Omit<Employee, 'id' | 'currentWorkload' | 'avatar' | 'employeeNo' | 'createdAt'>) => void;
-  updateEmployee: (empId: string, patch: Partial<Omit<Employee, 'id'>>) => void;
-  removeEmployee: (empId: string) => void;
+  addEmployee: (emp: Omit<Employee, 'id' | 'currentWorkload' | 'avatar' | 'employeeNo' | 'createdAt'>) => Promise<void>;
+  updateEmployee: (empId: string, patch: Partial<Omit<Employee, 'id'>>) => Promise<void>;
+  removeEmployee: (empId: string) => Promise<void>;
 
   // Notifications
-  addNotification: (msg: string, type?: Notification['type'], link?: string) => void;
-  markAllNotificationsRead: () => void;
-  clearNotifications: () => void;
+  markAllNotificationsRead: () => Promise<void>;
 
   // Toast
   setToast: (msg: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   clearToast: () => void;
-
-  // Utils
-  resetStore: () => void;
 }
 
-const INITIAL_EMPLOYEES: Employee[] = [
-  { id: 'e1', employeeNo: 'EMP-2023-001', name: '김개발', email: 'kim.dev@heyzzabi.com', phone: '010-1234-5601', role: 'Frontend', department: '개발팀', position: '대리', skills: ['React', 'TypeScript', 'CSS'], certifications: ['정보처리기사'], pastProjects: ['로그인 시스템 리뉴얼', 'API 연동 모듈'], currentWorkload: 70, avatar: '김', level: 'member', status: 'ACTIVE', hireDate: '2023-03-02', lastLoginAt: '2026-08-12 09:12', createdAt: '2023-03-02' },
-  { id: 'e2', employeeNo: 'EMP-2021-014', name: '박서버', email: 'park.server@heyzzabi.com', phone: '010-1234-5602', role: 'Backend', department: '개발팀', position: '과장', skills: ['Node.js', 'Python', 'PostgreSQL', 'AWS'], certifications: ['AWS SAA', '정보처리기사'], pastProjects: ['API 서버 구축', 'DB 최적화 프로젝트'], currentWorkload: 40, avatar: '박', level: 'lead', status: 'ACTIVE', hireDate: '2021-07-19', lastLoginAt: '2026-08-13 08:45', createdAt: '2021-07-19' },
-  { id: 'e3', employeeNo: 'EMP-2022-032', name: '이디자인', email: 'lee.design@heyzzabi.com', phone: '010-1234-5603', role: 'UI/UX Designer', department: '디자인팀', position: '사원', skills: ['Figma', 'Illustrator', 'Prototyping'], certifications: ['GTQ'], pastProjects: ['모바일앱 디자인', '브랜드 가이드라인'], currentWorkload: 55, avatar: '이', level: 'member', status: 'ACTIVE', hireDate: '2022-05-10', lastLoginAt: '2026-08-11 17:30', createdAt: '2022-05-10' },
-  { id: 'e4', employeeNo: 'EMP-2019-003', name: '최PM', email: 'choi.pm@heyzzabi.com', phone: '010-1234-5604', role: 'Project Manager', department: '기획팀', position: '부장', skills: ['Agile', 'JIRA', 'Roadmapping'], certifications: ['PMP'], pastProjects: ['V1.0 런치', '파이프라인 기획'], currentWorkload: 90, avatar: '최', level: 'pm', status: 'ACTIVE', hireDate: '2019-01-14', lastLoginAt: '2026-08-13 09:02', createdAt: '2019-01-14' },
-];
-
-const INITIAL_MEETINGS: Meeting[] = [
-  {
-    id: 'm1',
-    title: '[주간회의] Hey Zzabi AI 파이프라인 개편 논의',
-    date: '2026. 08. 12',
-    summary: [
-      'AI 4단계 업무 파이프라인 기획서 초안 작성 필요',
-      'UI/UX 디자인 통일 작업 - 전체 화면 일관성 점검',
-      'Neo4j 기반 코드 영향 분석 모듈 검토 및 도입 결정',
-      '신규 팀원 온보딩 자동화 기능 우선순위 논의',
-      'Q3 스프린트 일정 최종 확정',
-    ],
-    hasProposal: false,
-    isProposalApproved: false,
-    isProposalRejected: false,
-    isTasksExtracted: false,
-    extractedTasks: [],
-  },
-  {
-    id: 'm2',
-    title: '[긴급회의] 사용자 인증 버그 대응',
-    date: '2026. 08. 10',
-    summary: [
-      '소셜 로그인 토큰 만료 버그 원인 파악 완료 (JWT 갱신 로직 오류)',
-      '핫픽스 배포 일정: 8월 10일 자정',
-      '재발 방지를 위한 테스트 커버리지 확대 필요',
-      '사용자 공지 문구 작성 및 CS팀 공유',
-    ],
-    hasProposal: true,
-    proposalContent: `# [긴급 기획서] 사용자 인증 버그 대응\n\n## 1. 배경\nJWT 토큰 갱신 로직 오류로 인해 소셜 로그인 사용자 일부가 인증 실패 현상 발생.\n\n## 2. 대응 계획\n- 핫픽스: refreshToken 만료 시 재발급 로직 수정\n- QA: 전체 인증 플로우 회귀 테스트\n- 사용자 공지: 점검 완료 후 CS팀 통해 배포\n\n## 3. 기대 효과\n- 인증 실패율 0% 달성\n- 사용자 신뢰도 회복`,
-    isProposalApproved: false,
-    isProposalRejected: false,
-    isTasksExtracted: false,
-    extractedTasks: [],
-    analysis: {
-      agenda: ['소셜 로그인 토큰 만료 버그 원인 파악', 'Q3 핫픽스 배포 일정 결정', '재발 방지 방안 논의'],
-      decisions: ['JWT 갱신 로직 즉시 수정 (8/10 자정 배포)', '테스트 커버리지 80% 이상 확대', 'CS팀 사전 공유'],
-      actionItems: ['refreshToken 갱신 로직 수정 (박서버)', '회귀 테스트 작성 (김개발)', '사용자 공지 문구 작성 (이디자인)', 'CS팀 공유 문서 작성 (최PM)'],
-    },
-  },
-];
-
-function generateAnalysis(summary: string[]): StructuredAnalysis {
+// meeting/planning payload from /api/meetings 응답 -> UI Meeting 모델로 매핑
+interface MeetingApiDTO {
+  id: string; title: string; date: string; meetingDateIso: string; summary: string[]; hasProposal: boolean;
+  proposalId?: string; proposalTitle?: string; proposalContent?: string;
+  analysis?: StructuredAnalysis; isProposalApproved: boolean; isTasksExtracted: boolean;
+  isProposalRejected: boolean; proposalRejectedReason?: string;
+}
+function mapMeeting(m: MeetingApiDTO): Meeting {
   return {
-    agenda: summary.slice(0, Math.ceil(summary.length / 2)).map(s => s.replace(/^\d+\.\s*/, '')),
-    decisions: [
-      `${summary[0]?.replace(/^\d+\.\s*/, '').split(' ').slice(0, 4).join(' ')} 건 진행 확정`,
-      '다음 스프린트 내 완료 목표',
-      '팀장 검토 후 최종 승인 진행',
-    ],
-    actionItems: summary.map(s => s.replace(/^\d+\.\s*/, '')),
+    id: m.id, title: m.title, date: m.date, meetingDateIso: m.meetingDateIso, summary: m.summary,
+    analysis: m.analysis, hasProposal: m.hasProposal, proposalContent: m.proposalContent,
+    isProposalApproved: m.isProposalApproved, isTasksExtracted: m.isTasksExtracted,
+    isProposalRejected: m.isProposalRejected, proposalRejectedReason: m.proposalRejectedReason,
+  };
+}
+
+interface TaskApiDTO {
+  id: string; title: string; description?: string; source: string; status: string;
+  assigneeId?: string; progress: number; estimatedHours?: number; difficulty?: string;
+  rejectedReason?: string; delayReason?: string; completedAt?: string; completedAtIso?: string; createdAtIso: string;
+}
+function mapTask(t: TaskApiDTO): Task | null {
+  const status = DB_TASK_STATUS_TO_UI[t.status];
+  if (!status) return null;
+  return {
+    id: t.id, title: t.title, source: t.source, status,
+    assigneeId: t.assigneeId, progress: t.progress, estimatedHours: t.estimatedHours,
+    difficulty: t.difficulty as Task['difficulty'], rejectedReason: t.rejectedReason,
+    delayReason: t.delayReason, completedAt: t.completedAt, completedAtIso: t.completedAtIso, createdAtIso: t.createdAtIso,
   };
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  meetings: INITIAL_MEETINGS,
+  meetings: [],
   tasks: [],
-  employees: INITIAL_EMPLOYEES,
-  notifications: [
-    { id: 'n1', message: 'Hey Zzabi 파이프라인 엔진이 정상 가동 중입니다.', type: 'info', timestamp: '2026. 08. 12 09:00', read: false, link: '/dashboard' },
-    { id: 'n2', message: '[긴급회의] 기획서가 자동 생성되었습니다. 검토해 주세요.', type: 'success', timestamp: '2026. 08. 10 14:30', read: true, link: '/meetings' },
-  ],
+  employees: [],
+  notifications: [],
+  activeUserId: null,
+  loading: false,
   toast: null,
 
+  setActiveUser: (id) => set({ activeUserId: id }),
+
   fetchData: async () => {
+    set({ loading: true });
     try {
-      const [backendMeetings, backendSpecs, backendTasks] = await Promise.all([
-        apiMeetings.list(),
-        apiSpecs.list(),
-        apiTasks.list(),
+      const [meetings, tasks, employees, notifications] = await Promise.all([
+        apiFetch<MeetingApiDTO[]>('/api/meetings'),
+        apiFetch<TaskApiDTO[]>('/api/tasks'),
+        apiFetch<Employee[]>('/api/employees'),
+        apiFetch<Notification[]>('/api/notifications'),
       ]);
-
-      if (!Array.isArray(backendMeetings)) return; // If API completely fails
-
-      const mappedTasks: Task[] = (backendTasks as any[]).map(t => ({
-        id: `t_${t.id}`,
-        title: t.task_title,
-        source: t.spec_title,
-        status: t.status === 'PENDING_APPROVAL' ? 'pending-distribution' : 'in-progress',
-        assigneeId: `e_${t.assigned_user}`,
-        estimatedHours: 8,
-        progress: t.status === 'APPROVED' ? 10 : 0,
-      }));
-
-      const mappedMeetings: Meeting[] = (backendMeetings as any[]).map(m => {
-        const spec = (backendSpecs as any[]).find(s => s.meeting === m.id);
-        const relatedTasks = (backendTasks as any[]).filter(t => t.spec === spec?.id);
-        
-        return {
-          id: `m_${m.id}`,
-          title: m.title,
-          date: new Date(m.created_at).toLocaleDateString(),
-          summary: m.content ? m.content.split('\n') : ['(내용 없음)'],
-          hasProposal: !!spec,
-          isProposalApproved: spec?.status === 'REVIEWED',
-          isProposalRejected: false,
-          proposalContent: spec ? `# ${spec.title}\n${spec.summary}` : undefined,
-          isTasksExtracted: relatedTasks.length > 0,
-          extractedTasks: relatedTasks.map(t => `t_${t.id}`),
-        };
+      set({
+        meetings: meetings.map(mapMeeting),
+        tasks: tasks.map(mapTask).filter((t): t is Task => t !== null),
+        employees,
+        notifications,
+        loading: false,
+        activeUserId: get().activeUserId || employees.find(e => e.level === 'pm')?.id || employees[0]?.id || null,
       });
-
-      set({ meetings: mappedMeetings, tasks: mappedTasks });
     } catch (err) {
-      console.warn('API Fetch failed, using mock data fallback.', err);
+      set({ loading: false, toast: { message: err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.', type: 'error' } });
     }
   },
 
-  addMeeting: async (meeting) => {
+  addMeeting: async ({ title, content }) => {
     try {
-      await apiMeetings.create({
-        title: meeting.title,
-        content: meeting.summary.join('\n'),
-        status: 'DRAFT',
-      });
-      get().fetchData();
-      get().setToast('회의록이 성공적으로 등록되었습니다.', 'success');
+      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content }) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '회의록이 등록되었습니다.', type: 'success' } });
     } catch (err) {
-      console.warn('API failed', err);
-      // Fallback
-      set((state) => ({
-        meetings: [{
-          ...meeting,
-          id: `m_${Date.now()}`,
-          hasProposal: false,
-          isProposalApproved: false,
-          isProposalRejected: false,
-          isTasksExtracted: false,
-          extractedTasks: [],
-        }, ...state.meetings],
-      }));
+      set({ toast: { message: err instanceof Error ? err.message : '회의록 등록에 실패했습니다.', type: 'error' } });
     }
   },
 
-  deleteMeeting: (meetingId) => set((state) => ({
-    meetings: state.meetings.filter(m => m.id !== meetingId),
-    toast: { message: '회의록이 삭제되었습니다.', type: 'info' },
-  })),
+  deleteMeeting: async (meetingId) => {
+    try {
+      await apiFetch(`/api/meetings/${meetingId}`, { method: 'DELETE' }, get().activeUserId);
+      set(state => ({ meetings: state.meetings.filter(m => m.id !== meetingId), toast: { message: '회의록이 삭제되었습니다.', type: 'info' } }));
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '회의록 삭제에 실패했습니다.', type: 'error' } });
+    }
+  },
 
   generateProposal: async (meetingId) => {
-    // API 명세: 회의록 상태를 REVIEWED로 변경하고 백그라운드 태스크로 기획서 자동 생성 시작
     try {
-      const numericId = parseInt(meetingId.replace('m_', ''));
-      if (!isNaN(numericId)) {
-        await apiMeetings.reviewComplete(numericId);
-        get().setToast('기획서 자동 생성이 시작되었습니다.', 'success');
-        // 주기적으로 fetch 하거나 잠시 후 fetch
-        setTimeout(() => get().fetchData(), 3000);
-      }
+      set({ toast: { message: 'AI가 회의록을 분석해 기획서를 작성하고 있습니다...', type: 'info' } });
+      await apiFetch(`/api/meetings/${meetingId}/review-complete`, { method: 'POST' }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: 'AI 기획서 초안이 생성되었습니다. 내용을 검토해 주세요.', type: 'success' } });
     } catch (err) {
-      console.warn('API failed', err);
+      set({ toast: { message: err instanceof Error ? err.message : '기획서 생성에 실패했습니다.', type: 'error' } });
     }
-
-    set((state) => {
-    const meeting = state.meetings.find(m => m.id === meetingId);
-    if (!meeting) return {};
-    const analysis = generateAnalysis(meeting.summary);
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `'${meeting.title}' 기획서 초안이 생성되었습니다. 검토 후 확정해 주세요.`,
-      type: 'success',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/meetings',
-    };
-    return {
-      meetings: state.meetings.map(m =>
-        m.id === meetingId ? {
-          ...m,
-          hasProposal: true,
-          isProposalRejected: false,
-          proposalRejectedReason: undefined,
-          analysis,
-          proposalContent: `# [기획서] ${m.title}\n\n## 1. 배경 및 목적\n회의에서 논의된 내용을 기반으로 자동 작성된 기획서입니다.\n\n## 2. 주요 안건 요약\n${analysis.agenda.map(a => `- ${a}`).join('\n')}\n\n## 3. 결정사항\n${analysis.decisions.map(d => `- ${d}`).join('\n')}\n\n## 4. 핵심 요구사항 (Action Items)\n${analysis.actionItems.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\n## 5. 기대 효과\n- 업무 병목 해소 및 팀 생산성 향상\n- 명확한 R&R 분리로 과부하 방지\n- 파이프라인 자동화를 통한 의사결정 속도 2배 개선\n\n## 6. 일정 계획\n- 1주차: 기획서 확정 및 공유\n- 2주차: 개발 착수\n- 3주차: QA 및 스테이징 배포\n- 4주차: 프로덕션 배포 및 모니터링`,
-        } : m
-      ),
-      notifications: [notif, ...state.notifications],
-      toast: { message: 'AI 기획서 초안이 생성되었습니다. 내용을 검토해 주세요.', type: 'success' },
-    };
-    });
   },
 
-  editProposal: (meetingId, content) => set((state) => ({
-    meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m),
-  })),
+  editProposal: async (meetingId, content) => {
+    const meeting = get().meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    try {
+      await apiFetch(`/api/meetings/${meetingId}`, { method: 'PATCH', body: JSON.stringify({}) }, get().activeUserId);
+      set(state => ({ meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m) }));
+    } catch {
+      // editProposal은 로컬 편집 상태만 반영 (저장은 별도 planning PATCH 라우트 필요 시 확장)
+      set(state => ({ meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m) }));
+    }
+  },
 
-  rejectProposal: (meetingId, reason) => set((state) => {
-    const meeting = state.meetings.find(m => m.id === meetingId);
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `'${meeting?.title}' 기획서가 반려되었습니다. 사유: ${reason}`,
-      type: 'warning',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/meetings',
-    };
-    return {
-      meetings: state.meetings.map(m =>
-        m.id === meetingId ? {
-          ...m,
-          hasProposal: false,
-          isProposalRejected: true,
-          proposalRejectedReason: reason,
-        } : m
-      ),
-      notifications: [notif, ...state.notifications],
-      toast: { message: '기획서가 반려되었습니다. 회의록을 수정 후 재요청하세요.', type: 'warning' },
-    };
-  }),
+  rejectProposal: async (meetingId, reason) => {
+    const meeting = get().meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    try {
+      // meeting -> planning id는 서버가 알고 있으므로, 회의 상세에서 프로포절 id를 못 찾을 수 있어
+      // review-complete 흐름에서 이미 planning이 생성되어 있어야 함. 여기서는 meeting id로 재조회 후 처리.
+      const fresh = await apiFetch<MeetingApiDTO[]>('/api/meetings');
+      const target = fresh.find(m => m.id === meetingId);
+      if (!target?.proposalId) throw new Error('반려할 기획서를 찾을 수 없습니다.');
+      await apiFetch(`/api/plannings/${target.proposalId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '기획서가 반려되었습니다.', type: 'warning' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '기획서 반려에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  downloadPPT: async (meetingId: string) => {
+  downloadPPT: async (meetingId) => {
     const meeting = get().meetings.find(m => m.id === meetingId);
     if (!meeting || !meeting.proposalContent) {
       set({ toast: { message: '기획서가 존재하지 않습니다.', type: 'error' } });
       return;
     }
-    
     set({ toast: { message: 'PPT 생성 중입니다. 잠시만 기다려주세요...', type: 'info' } });
     try {
       await generateProposalPPT(meeting.title, meeting.proposalContent, meeting.date);
       set({ toast: { message: 'PPT가 성공적으로 다운로드 되었습니다.', type: 'success' } });
     } catch (e) {
-      console.error(e);
-      set({ toast: { message: 'PPT 생성 중 오류가 발생했습니다.', type: 'error' } });
+      set({ toast: { message: e instanceof Error ? e.message : 'PPT 생성 중 오류가 발생했습니다.', type: 'error' } });
     }
   },
 
   approveProposalAndExtractTasks: async (meetingId) => {
     const meeting = get().meetings.find(m => m.id === meetingId);
     if (!meeting) return;
-
     try {
-      // Find spec ID from meetings (if backend mapped properly, we would store spec ID in meeting)
-      // For now, assume it works and fetch data after.
-      // 2-1 기획서 검토완료 버튼 클릭 시 호출
-      // Need spec ID. Let's just fallback to mock for now since we don't store spec ID cleanly in store.
+      set({ toast: { message: 'AI가 기획서를 업무 단위로 분해하고 있습니다...', type: 'info' } });
+      const fresh = await apiFetch<MeetingApiDTO[]>('/api/meetings');
+      const target = fresh.find(m => m.id === meetingId);
+      if (!target?.proposalId) throw new Error('배분할 기획서를 찾을 수 없습니다.');
+      const tasks = await apiFetch<TaskApiDTO[]>(`/api/plannings/${target.proposalId}/approve`, { method: 'POST' }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: `${tasks.length}개의 업무가 파이프라인 배분 대기열에 추가되었습니다.`, type: 'success' } });
     } catch (err) {
-      console.warn('API failed', err);
+      set({ toast: { message: err instanceof Error ? err.message : '업무 분해에 실패했습니다.', type: 'error' } });
     }
-
-    const taskTemplates = [
-      { suffix: '기획서 최종 확정 및 공유', hours: 2, diff: 'Low' as const },
-      { suffix: 'UI/UX 디자인 시안 작성', hours: 8, diff: 'High' as const },
-      { suffix: '백엔드 API 설계 및 구현', hours: 12, diff: 'High' as const },
-      { suffix: '프론트엔드 연동 및 단위 테스트', hours: 6, diff: 'Medium' as const },
-      { suffix: 'QA 및 버그 수정', hours: 4, diff: 'Medium' as const },
-    ];
-
-    const baseTitle = meeting.title.replace(/\[.*?\]\s*/, '');
-    const newTasks: Task[] = taskTemplates.map((t, i) => ({
-      id: `t_${Date.now()}_${i}`,
-      title: `${baseTitle} - ${t.suffix}`,
-      source: meeting.title,
-      estimatedHours: t.hours,
-      difficulty: t.diff,
-      status: 'pending-distribution',
-      progress: 0,
-    }));
-
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `'${meeting.title}'에서 ${newTasks.length}개 업무가 배분 대기열에 추가되었습니다.`,
-      type: 'success',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/pipeline',
-    };
-
-    set((state) => ({
-      meetings: state.meetings.map(m =>
-        m.id === meetingId ? { ...m, isProposalApproved: true, isTasksExtracted: true, extractedTasks: newTasks.map(t => t.id) } : m
-      ),
-      tasks: [...newTasks, ...state.tasks],
-      notifications: [notif, ...state.notifications],
-      toast: { message: `${newTasks.length}개의 업무가 파이프라인 배분 대기열에 추가되었습니다.`, type: 'success' },
-    }));
   },
 
-  approveDistribution: async (taskId, newAssigneeId) => {
+  approveDistribution: async (taskId, assigneeId) => {
     try {
-      const numericId = parseInt(taskId.replace('t_', ''));
-      if (!isNaN(numericId)) {
-        // 백엔드 API 명세에 단일 승인은 없고 다건 승인(approve-all)이 있음
-        await apiTasks.approveAll({ task_ids: [numericId] });
-        get().fetchData();
-      }
+      await apiFetch(`/api/tasks/${taskId}/approve-distribution`, { method: 'POST', body: JSON.stringify({ assigneeId }) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '업무가 배정되었습니다.', type: 'success' } });
     } catch (err) {
-      console.warn('API failed', err);
+      set({ toast: { message: err instanceof Error ? err.message : '배분 승인에 실패했습니다.', type: 'error' } });
     }
-
-    set((state) => {
-    const task = state.tasks.find(t => t.id === taskId);
-    const emp = state.employees.find(e => e.id === newAssigneeId);
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `[결재 승인] '${task?.title}'이(가) ${emp?.name}님에게 배정되었습니다.`,
-      type: 'success',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/approvals',
-    };
-    return {
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, status: 'in-progress', assigneeId: newAssigneeId, progress: 5, rejectedReason: undefined } : t
-      ),
-      employees: state.employees.map(e =>
-        e.id === newAssigneeId ? { ...e, currentWorkload: Math.min(100, e.currentWorkload + (task?.estimatedHours || 4) * 3) } : e
-      ),
-      notifications: [notif, ...state.notifications],
-      toast: { message: `[결재 완료] '${task?.title}'이(가) ${emp?.name}님에게 최종 배정되었습니다.`, type: 'success' },
-    };
-    });
   },
 
-  rejectDistribution: (taskId, reason) => set((state) => {
-    const task = state.tasks.find(t => t.id === taskId);
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `[배분 반려] '${task?.title}' 배분이 반려되었습니다. 사유: ${reason}`,
-      type: 'warning',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/approvals',
-    };
-    return {
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, status: 'pending-distribution', rejectedReason: reason } : t
-      ),
-      notifications: [notif, ...state.notifications],
-      toast: { message: '배분이 반려되었습니다. 담당자를 재검토해 주세요.', type: 'warning' },
-    };
-  }),
+  rejectDistribution: async (taskId, reason) => {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/reject-distribution`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '배분이 반려되었습니다.', type: 'warning' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '배분 반려에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  reportDelay: (taskId, reason) => set((state) => {
-    const task = state.tasks.find(t => t.id === taskId);
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `⚠️ '${task?.title}' 지연 감지. 사유: ${reason}`,
-      type: 'warning',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/pipeline',
-    };
-    return {
-      tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'delayed', delayReason: reason } : t),
-      notifications: [notif, ...state.notifications],
-      toast: { message: '지연이 감지되어 기록되었습니다. AI 재조정을 실행하세요.', type: 'warning' },
-    };
-  }),
+  reportDelay: async (taskId, reason) => {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/report-delay`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '지연이 감지되어 기록되었습니다.', type: 'warning' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '지연 보고에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  reallocateTask: (taskId) => set((state) => {
-    const task = state.tasks.find(t => t.id === taskId);
-    const bestEmp = [...state.employees]
-      .filter(e => e.id !== task?.assigneeId)
-      .sort((a, b) => a.currentWorkload - b.currentWorkload)[0] || state.employees[0];
-    const notif: Notification = {
-      id: `n_${Date.now()}`,
-      message: `[AI 재조정] '${task?.title}'이(가) ${bestEmp.name}님으로 재배정되었습니다.`,
-      type: 'success',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/pipeline',
-    };
-    return {
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, status: 'in-progress', assigneeId: bestEmp.id, delayReason: undefined } : t
-      ),
-      employees: state.employees.map(e =>
-        e.id === bestEmp.id ? { ...e, currentWorkload: Math.min(100, e.currentWorkload + 10) } : e
-      ),
-      notifications: [notif, ...state.notifications],
-      toast: { message: `[AI 재조정] ${bestEmp.name}님으로 재배정 완료`, type: 'success' },
-    };
-  }),
+  reallocateTask: async (taskId) => {
+    try {
+      await apiFetch(`/api/tasks/${taskId}/reallocate`, { method: 'POST' }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: 'AI 재조정이 완료되었습니다.', type: 'success' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '재조정에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  updateTaskStatus: (taskId, status) => set((state) => {
-    const task = state.tasks.find(t => t.id === taskId);
-    const notif: Notification | null = status === 'shipped' ? {
-      id: `n_${Date.now()}`,
-      message: `✅ '${task?.title}' 완료 처리 — 결재함에 기록되었습니다.`,
-      type: 'success',
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link: '/approvals',
-    } : null;
-    return {
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? {
-          ...t,
-          status,
-          ...(status === 'shipped' ? { progress: 100, completedAt: new Date().toLocaleDateString('ko-KR') } : {})
-        } : t
-      ),
-      notifications: notif ? [notif, ...state.notifications] : state.notifications,
-      toast: status === 'shipped' ? { message: '업무가 완료 처리되어 결재함에 기록되었습니다.', type: 'success' } : null,
-    };
-  }),
+  updateTaskStatus: async (taskId, status) => {
+    const dbStatus = status === 'shipped' ? 'DONE' : status === 'in-progress' ? 'IN_PROGRESS' : status === 'delayed' ? 'DELAYED' : 'PENDING_DISTRIBUTION';
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: dbStatus }) }, get().activeUserId);
+      await get().fetchData();
+      if (status === 'shipped') set({ toast: { message: '업무가 완료 처리되어 결재함에 기록되었습니다.', type: 'success' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '상태 변경에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  updateTaskProgress: (taskId, progress) => set((state) => ({
-    tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: Math.max(0, Math.min(100, progress)) } : t),
-  })),
+  updateTaskProgress: async (taskId, progress) => {
+    set(state => ({ tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: Math.max(0, Math.min(100, progress)) } : t) }));
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ progress }) }, get().activeUserId);
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '진행률 저장에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  addEmployee: (emp) => set((state) => {
-    const seq = state.employees.length + 1;
-    const employeeNo = `EMP-${new Date().getFullYear()}-${String(seq).padStart(3, '0')}`;
-    return {
-      employees: [...state.employees, {
-        ...emp,
-        id: `e_${Date.now()}`,
-        employeeNo,
-        currentWorkload: 0,
-        avatar: emp.name[0],
-        createdAt: new Date().toISOString().slice(0, 10),
-      }],
-      toast: { message: `${emp.name}님이 팀에 등록되었습니다. (사원번호: ${employeeNo})`, type: 'success' },
-    };
-  }),
+  addEmployee: async (emp) => {
+    try {
+      await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(emp) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: `${emp.name}님이 팀에 등록되었습니다.`, type: 'success' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '직원 등록에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  updateEmployee: (empId, patch) => set((state) => {
-    const target = state.employees.find(e => e.id === empId);
-    return {
-      employees: state.employees.map(e => e.id === empId ? { ...e, ...patch, avatar: patch.name ? patch.name[0] : e.avatar } : e),
-      toast: target ? { message: `${target.name}님의 정보가 수정되었습니다.`, type: 'success' } : null,
-    };
-  }),
+  updateEmployee: async (empId, patch) => {
+    try {
+      await apiFetch(`/api/employees/${empId}`, { method: 'PATCH', body: JSON.stringify(patch) }, get().activeUserId);
+      await get().fetchData();
+      set({ toast: { message: '직원 정보가 수정되었습니다.', type: 'success' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '직원 정보 수정에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  removeEmployee: (empId) => set((state) => ({
-    employees: state.employees.filter(e => e.id !== empId),
-    toast: { message: '팀원이 삭제되었습니다.', type: 'info' },
-  })),
+  removeEmployee: async (empId) => {
+    try {
+      await apiFetch(`/api/employees/${empId}`, { method: 'DELETE' }, get().activeUserId);
+      set(state => ({ employees: state.employees.filter(e => e.id !== empId), toast: { message: '직원이 삭제되었습니다.', type: 'info' } }));
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '직원 삭제에 실패했습니다.', type: 'error' } });
+    }
+  },
 
-  addNotification: (msg, type = 'info', link) => set((state) => ({
-    notifications: [{
-      id: `n_${Date.now()}`,
-      message: msg,
-      type,
-      timestamp: new Date().toLocaleString('ko-KR'),
-      read: false,
-      link,
-    }, ...state.notifications],
-  })),
-
-  markAllNotificationsRead: () => set((state) => ({
-    notifications: state.notifications.map(n => ({ ...n, read: true })),
-  })),
-
-  clearNotifications: () => set({ notifications: [] }),
+  markAllNotificationsRead: async () => {
+    set(state => ({ notifications: state.notifications.map(n => ({ ...n, read: true })) }));
+    try {
+      await apiFetch('/api/notifications/read-all', { method: 'PATCH' });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '알림 처리에 실패했습니다.', type: 'error' } });
+    }
+  },
 
   setToast: (msg, type = 'info') => set({ toast: { message: msg, type } }),
   clearToast: () => set({ toast: null }),
-
-  resetStore: () => set({
-    meetings: INITIAL_MEETINGS,
-    tasks: [],
-    employees: INITIAL_EMPLOYEES,
-    notifications: [],
-    toast: { message: '모든 데이터가 초기화되었습니다.', type: 'info' },
-  }),
 }));

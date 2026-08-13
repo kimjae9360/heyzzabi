@@ -1,0 +1,183 @@
+// Hey Zzabi - Prisma schema
+// Base model ported from per2, extended to match the authoritative
+// 사원/회의록/기획서/프로젝트/업무배분/추적 table spec (see
+// docs/superpowers/specs/2026-08-13-heyzzabi-realbackend-design.md).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id         String    @id @default(uuid()) // 사번/아이디
+  password        String // bcrypt hash
+  name            String
+  email           String    @unique // 회사 이메일
+  phone           String?
+  department      String // 부서 (department_id)
+  position        String // 직급 (position_id) - 사원/대리/과장/부장 등
+  job_title       String? // 직무 - Frontend/Backend/Designer/PM 등 (Hey Zzabi 확장 필드, 공식 스펙 외)
+  role            String    @default("USER") // 시스템 권한 (role) - USER/PM/ADMIN = 직원/팀장/관리자
+  employee_no     String    @unique // 사원번호
+  hire_date       DateTime?
+  status          String    @default("ACTIVE") // ACTIVE, LEAVE, RESIGNED, LOCKED
+  profile_image   String?
+  last_login_at   DateTime?
+  current_workload Int      @default(0) // 업무 배분 시 워크로드 계산용 (0-100)
+  stack           String? // 기술 스택 (JSON-encoded string array)
+  certifications  String? // 자격증 (JSON-encoded string array)
+  past_projects   String? // 주요 프로젝트 이력 (JSON-encoded string array)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // Relations
+  tasks               Task[]
+  assignment_logs      TaskAssignmentLog[]
+  notifications        Notification[]
+  organized_meetings   Meeting[]            @relation("MeetingOrganizer")
+  created_meetings     Meeting[]            @relation("MeetingCreator")
+  participations       MeetingParticipant[]
+  authored_plans       Planning[]           @relation("PlanAuthor")
+  approved_plans       Planning[]           @relation("PlanApprover")
+  created_projects     Project[]            @relation("ProjectAuthor")
+}
+
+model Project {
+  project_id   String    @id @default(uuid())
+  title        String
+  description  String?
+  status       String    @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, SUSPENDED, HOLD
+  priority     String    @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  start_date   DateTime?
+  end_date     DateTime?
+  progress     Int       @default(0)
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  // Relations
+  author_id String
+  author    User       @relation("ProjectAuthor", fields: [author_id], references: [user_id])
+  tasks     Task[]
+  meetings  Meeting[]
+  plannings Planning[]
+}
+
+model Meeting {
+  meeting_id   String    @id @default(uuid())
+  title        String
+  meeting_date DateTime
+  location     String?
+  meeting_type String // 정기회의/프로젝트/부서회의 등
+  content      String
+  summary      String? // AI가 생성한 요약
+  status       String    @default("DRAFT") // DRAFT(작성중), REVIEW(검토중), CONFIRMED(확정)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  // Relations
+  project_id   String?
+  project      Project?             @relation(fields: [project_id], references: [project_id])
+  organizer_id String
+  organizer    User                 @relation("MeetingOrganizer", fields: [organizer_id], references: [user_id])
+  created_by   String
+  creator      User                 @relation("MeetingCreator", fields: [created_by], references: [user_id])
+  participants MeetingParticipant[]
+  plannings    Planning[]
+  tasks        Task[]
+}
+
+model MeetingParticipant {
+  participant_id    String @id @default(uuid())
+  attendance_status String @default("ATTENDED") // ATTENDED, ABSENT, PROXY
+  role              String @default("PARTICIPANT") // ORGANIZER, PARTICIPANT, PRESENTER
+
+  // Relations
+  meeting_id String
+  meeting    Meeting @relation(fields: [meeting_id], references: [meeting_id], onDelete: Cascade)
+  user_id    String
+  user       User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model Planning {
+  planning_id     String    @id @default(uuid()) // 기획서 ID
+  title           String
+  description     String?
+  content         String // 기획서 본문 (LONGTEXT 대응)
+  version         String    @default("1.0")
+  status          String    @default("DRAFT") // DRAFT/REVIEW/APPROVED/REJECTED/COMPLETED
+  rejected_reason String?
+  analysis_json   String? // AI 구조화 분석 {agenda, decisions, actionItems} (JSON)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  approved_by     String?
+  approved_at     DateTime?
+
+  // Relations
+  project_id String
+  project    Project @relation(fields: [project_id], references: [project_id])
+  meeting_id String?
+  meeting    Meeting? @relation(fields: [meeting_id], references: [meeting_id])
+  author_id  String
+  author     User    @relation("PlanAuthor", fields: [author_id], references: [user_id])
+  approver   User?   @relation("PlanApprover", fields: [approved_by], references: [user_id])
+  tasks      Task[]
+}
+
+model Task {
+  task_id         String    @id @default(uuid())
+  title           String
+  description     String?
+  // PENDING_DISTRIBUTION(배분대기) / TODO / IN_PROGRESS / REVIEW / DELAYED(지연) / DONE / CANCELLED
+  status          String    @default("PENDING_DISTRIBUTION")
+  progress        Int       @default(0) // 0-100
+  estimated_hours Int?
+  difficulty      String? // High / Medium / Low
+  rejected_reason String? // 배분 반려 사유
+  delay_reason    String? // 지연 사유
+  start_date      DateTime?
+  end_date        DateTime?
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // Relations
+  assignee_id String?
+  assignee    User?     @relation(fields: [assignee_id], references: [user_id])
+  project_id  String?
+  project     Project?  @relation(fields: [project_id], references: [project_id])
+  planning_id String?
+  planning    Planning? @relation(fields: [planning_id], references: [planning_id])
+  meeting_id  String?
+  meeting     Meeting?  @relation(fields: [meeting_id], references: [meeting_id])
+  assignment_logs TaskAssignmentLog[]
+}
+
+// "추적" - 업무 담당자 변경 이력 (감사 추적용)
+model TaskAssignmentLog {
+  log_id     String   @id @default(uuid())
+  action     String // ASSIGNED / REASSIGNED / REJECTED
+  note       String?
+  created_at DateTime @default(now())
+
+  task_id String
+  task    Task   @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
+  user_id String
+  user    User   @relation(fields: [user_id], references: [user_id])
+}
+
+model Notification {
+  notification_id String   @id @default(uuid())
+  message         String
+  type            String   @default("info") // info/success/warning/error
+  link            String?
+  read            Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [user_id])
+}

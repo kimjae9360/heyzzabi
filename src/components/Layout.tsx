@@ -1,38 +1,46 @@
-import { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { useAppStore } from '../store/useAppStore';
+'use client';
 
-const globalNavItems = [
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAppStore, type Employee } from '@/store/useAppStore';
+
+const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?: Employee['level'] }[] = [
   { name: '홈', path: '/dashboard', icon: Home },
   { name: '회의분석', path: '/meetings', icon: Mic2 },
   { name: '업무관리', path: '/pipeline', icon: Briefcase },
-  { name: '결재함', path: '/approvals', icon: CheckSquare },
-  { name: '직원관리', path: '/employees', icon: Users },
+  { name: '업무보드', path: '/tasks', icon: ListChecks },
+  { name: '결재함', path: '/approvals', icon: CheckSquare, minLevel: 'lead' },
+  { name: '직원관리', path: '/employees', icon: Users, minLevel: 'pm' },
   { name: '지식망', path: '/knowledge', icon: Network },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },
 ];
 
-export default function Layout() {
-  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData } = useAppStore();
-  const location = useLocation();
-  const navigate = useNavigate();
+const LEVEL_RANK: Record<Employee['level'], number> = { member: 0, lead: 1, pm: 2 };
+const LEVEL_LABEL: Record<Employee['level'], string> = { member: '직원', lead: '팀장', pm: '관리자' };
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], employees = [], fetchData, activeUserId, setActiveUser } = useAppStore();
+  const pathname = usePathname();
+  const router = useRouter();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const pendingApprovals = tasks.filter(t => t.status === 'pending-distribution').length;
+  const activeUser = employees.find(e => e.id === activeUserId);
+  const activeLevel = activeUser?.level ?? 'member';
 
-  // Redirect / to /dashboard
-  useEffect(() => {
-    if (location.pathname === '/') navigate('/dashboard', { replace: true });
-  }, [location.pathname, navigate]);
+  const visibleNavItems = globalNavItems.filter(item => !item.minLevel || LEVEL_RANK[activeLevel] >= LEVEL_RANK[item.minLevel]);
 
   // Initial API Fetch
   useEffect(() => {
@@ -52,6 +60,7 @@ export default function Layout() {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setIsSearchFocused(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setIsUserMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -66,7 +75,7 @@ export default function Layout() {
   ] : [];
 
   const handleSearchResultClick = (link: string) => {
-    navigate(link);
+    router.push(link);
     setSearchQuery('');
     setIsSearchFocused(false);
   };
@@ -194,7 +203,7 @@ export default function Layout() {
                   ) : notifications.map(n => (
                     <button
                       key={n.id}
-                      onClick={() => { if (n.link) navigate(n.link); setIsNotifOpen(false); }}
+                      onClick={() => { if (n.link) router.push(n.link); setIsNotifOpen(false); }}
                       className={cn("w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left", !n.read && "bg-blue-50/50")}
                     >
                       <div className={cn(
@@ -216,13 +225,43 @@ export default function Layout() {
 
           <div className="w-px h-5 bg-gray-200 mx-1" />
 
-          {/* User Badge */}
-          <div className="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="text-right hidden sm:block">
-              <div className="text-gray-900 font-bold text-xs leading-tight">최PM</div>
-              <div className="text-gray-400 text-[9px]">프로젝트 관리자</div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">PM</div>
+          {/* User Badge / Role Switcher (로그인 연동 전 임시: 보기 권한 전환) */}
+          <div ref={userMenuRef} className="relative">
+            <button
+              onClick={() => setIsUserMenuOpen(v => !v)}
+              className="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <div className="text-right hidden sm:block">
+                <div className="text-gray-900 font-bold text-xs leading-tight">{activeUser?.name || '사용자 선택'}</div>
+                <div className="text-gray-400 text-[9px]">{LEVEL_LABEL[activeLevel]} · {activeUser?.role || '-'}</div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                {activeUser?.avatar || '?'}
+              </div>
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+            {isUserMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  보기 권한 전환 (로그인 연동 전 임시)
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+                  {employees.map(emp => (
+                    <button
+                      key={emp.id}
+                      onClick={() => { setActiveUser(emp.id); setIsUserMenuOpen(false); }}
+                      className={cn("w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left", emp.id === activeUserId && "bg-blue-50")}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs shrink-0">{emp.avatar}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-gray-900">{emp.name}</div>
+                        <div className="text-[9px] text-gray-400">{LEVEL_LABEL[emp.level]} · {emp.department}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -230,13 +269,13 @@ export default function Layout() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className="w-[68px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col items-center pt-3 pb-4 gap-0.5 z-10">
-          {globalNavItems.map((item) => {
-            const isActive = location.pathname.startsWith(item.path) || (item.path === '/dashboard' && location.pathname === '/');
+          {visibleNavItems.map((item) => {
+            const isActive = pathname.startsWith(item.path);
             const badge = item.name === '결재함' ? pendingApprovals : 0;
             return (
-              <NavLink
+              <Link
                 key={item.path}
-                to={item.path}
+                href={item.path}
                 title={item.name}
                 className={cn(
                   "relative flex flex-col items-center justify-center gap-1 w-[56px] h-[52px] rounded-xl transition-all",
@@ -251,7 +290,7 @@ export default function Layout() {
                     {badge}
                   </span>
                 )}
-              </NavLink>
+              </Link>
             );
           })}
         </aside>
@@ -276,7 +315,7 @@ export default function Layout() {
               </div>
             </div>
           )}
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>

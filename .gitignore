@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Next.js
+.next
+next-env.d.ts
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env*.local
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

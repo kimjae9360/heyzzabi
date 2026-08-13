@@ -97,3 +97,60 @@ AI 호출(수 초 소요)이 진행되는 동안 **클릭한 버튼 자체가 �
 - Prisma 마이그레이션 적용 후 시드 스크립트로 기본 사용자/프로젝트 생성.
 - 각 API 라우트에 대해 정상/에러 케이스 수동 검증(브라우저로 버튼 클릭 흐름 실제 확인).
 - `npx tsc --noEmit`으로 타입 체크, `next build`로 빌드 검증.
+
+---
+
+## 구현 결과 (As-Built, 2026-08-13)
+
+위 설계대로 마이그레이션을 완료했다. 계획 대비 달라지거나 추가된 부분만 기록한다.
+
+### 데이터 모델
+- 계획대로 `User.current_workload`, `Planning.rejected_reason`, `Task.rejected_reason` 등 추가.
+- 계획에 없던 추가: `Planning.analysis_json`(회의 AI 분석 agenda/decisions/actionItems 구조화 저장 —
+  Meetings 페이지의 "AI 분석" 탭이 실제 데이터로 동작하려면 필요했음), `TaskAssignmentLog`(추적
+  테이블 — 담당자 배정/재배정 이력), `User.job_title`(직무 — 공식 스펙에는 없지만 기존 UI가
+  이미 사용 중이던 필드라 유지).
+- `Task.status` 최종 어휘: `PENDING_DISTRIBUTION`/`TODO`/`IN_PROGRESS`/`REVIEW`/`DELAYED`/`DONE`/
+  `CANCELLED` — erpnext 조사 결과를 반영해 `CANCELLED`를 추가. `src/lib/taskWorkflow.ts`에 plane
+  스타일 상태 전이 검증(허용 안 된 전이는 명확한 에러)을 구현하고 모든 상태 변경 API에 적용.
+
+### 인증/역할
+- 로그인 UI는 계획대로 2차 범위로 미룸. 대신 `x-user-id` 헤더로 "현재 행동 주체"를 식별하는
+  임시 방편(`src/lib/currentUser.ts`)을 두고, 헤더 상단에 **역할 전환 스위처**(로그인 대신 시드된
+  직원 중 하나를 "나"로 선택)를 추가했다 — PM 화면과 일반 직원 화면이 실제로 다르게 보여야 한다는
+  요구사항에 따라 nav 항목을 역할별로 필터링한다: 결재함은 팀장(lead) 이상, 직원관리와 설정의
+  "데이터 초기화"는 관리자(pm)만 노출.
+
+### 신규 페이지
+- 계획에 없던 **직원관리(Employees)** 페이지를 정식 메뉴로 추가(사원 스펙 전 필드: 사번/이메일/
+  연락처/부서/직급/시스템권한/입사일/상태/기술스택 CRUD). Settings의 "팀원 관리" 탭은 제거하고
+  이 페이지로 이관.
+- nav에 없어 접근 불가능했던 기존 **Tasks(업무보드)** 페이지를 "업무보드"로 nav에 연결.
+
+### 목업 제거 상세
+- Pipeline 하단 가짜 Terminal Log 제거(계획대로).
+- `useDashboardStore.ts`(미사용 목업 스토어), `src/lib/api.ts`(존재하지 않는 Django API를 가리키던
+  구 클라이언트) 삭제.
+- Dashboard의 주차별 트렌드 차트가 하드코딩된 배열(`TREND_DATA`)이었음을 빌드 중 발견 — 실제
+  회의/업무 타임스탬프(`meetingDateIso`, `completedAtIso`)로 집계하도록 교체.
+- KnowledgeBase(가짜 force-graph 목업 데이터)와 Integrations(가짜 OAuth 토글 + 가짜 Neo4j 질의
+  응답)는 실제 백엔드가 전혀 없는 완전한 연출이었음을 확인 — "준비 중" 안내 화면으로 교체하고,
+  가짜로 동작하는 것처럼 보이는 버튼은 모두 제거했다. 이 두 기능의 실제 구현(RAG 지식그래프,
+  OAuth 연동)은 여전히 2차 범위다.
+- Settings의 "플랫폼 정보" 패널이 "AI 엔진: LangGraph v0.2 (모사)", "데이터 모드: Local Store
+  (Zustand)" 등 이제는 사실이 아닌 문구를 담고 있어 실제 스택(OpenAI gpt-4o-mini, Prisma+SQLite)
+  으로 수정. "데이터 초기화" 버튼은 계획에 없던 실제 API(`/api/system/reset`)를 새로 만들어
+  연결(회의록/기획서/업무/알림만 삭제, 직원 계정은 보존).
+
+### AI 연동 관련 실전 이슈
+- OpenAI `response_format: json_object`는 프롬프트에 리터럴 "JSON" 단어가 없으면 400 에러를
+  낸다는 것을 실제 키로 테스트하며 발견 — 두 번째/세 번째 단계 프롬프트에서 누락되어 있던 것을
+  수정. 실제 API 키로 회의→기획서→업무분해 전체 체인을 end-to-end 검증 완료.
+- `Task.source`가 planning_id/meeting_id raw UUID를 그대로 노출하던 버그를 발견(모든 `toTaskDTO`
+  호출부에 `include: { planning: true, meeting: true }` 누락) — 수정하여 실제 회의/기획서 제목이
+  표시되도록 함.
+
+### 미완 / 다음 단계
+- 로그인 UI 연결, KnowledgeBase 실제 RAG 구현, Integrations 실제 OAuth 연동은 여전히 2차 범위.
+- `@dnd-kit/*` 의존성은 실제 드래그앤드롭이 구현되지 않아 제거함 — Pipeline 보드는 버튼 기반
+  전이(승인/반려/완료)로 동작하며, plane 스타일 드래그 인터랙션은 향후 개선 과제로 남긴다.
