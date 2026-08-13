@@ -1,24 +1,17 @@
 import { useState } from 'react';
-import { GitBranch, CheckCircle2, AlertCircle, User, Terminal, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
+import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 
-interface LogMessage { id: string; time: string; message: string; type: 'info' | 'success' | 'warning' | 'error'; }
 interface RejectModal { type: 'proposal' | 'distribution'; id: string; title: string; }
 
 export default function Pipeline() {
   const { meetings = [], tasks = [], employees = [], generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
 
-  const [logs, setLogs] = useState<LogMessage[]>([
-    { id: 'init', time: new Date().toLocaleTimeString(), message: 'Hey Zzabi Pipeline Engine Initialized. Waiting for triggers...', type: 'info' }
-  ]);
   const [rejectModal, setRejectModal] = useState<RejectModal | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [manualAssignees, setManualAssignees] = useState<Record<string, string>>({});
-
-  const addLog = (msg: string, type: LogMessage['type'] = 'info') =>
-    setLogs(prev => [{ id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: msg, type }, ...prev].slice(0, 60));
 
   const meetingsRaw = meetings.filter(m => !m.hasProposal);
   const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted);
@@ -26,26 +19,12 @@ export default function Pipeline() {
   const activeTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'delayed');
   const shippedTasks = tasks.filter(t => t.status === 'shipped');
 
-  const handleGenerateProposal = (id: string, title: string) => {
-    addLog(`[Phase 1] 외부 웹(Agent-Reach) 검색 중: ${title}`, 'info');
-    setTimeout(() => {
-      addLog(`[Deep Research] 심층 분석 중...`, 'info');
-    }, 1500);
-    setTimeout(() => {
-      addLog(`[AI Engine] 기획서 초안 작성 중...`, 'info');
-    }, 3000);
-    setTimeout(() => {
-      generateProposal(id);
-      addLog(`[완료] 요약 및 기획서 초안 생성 완료.`, 'success');
-    }, 4500);
+  const handleGenerateProposal = (id: string) => {
+    generateProposal(id);
   };
 
-  const handleExtractTasks = (id: string, title: string) => {
-    addLog(`[Phase 2] PM 검토 완료. 업무 배분 API 요청 중: ${title}`, 'info');
-    setTimeout(() => {
-      approveProposalAndExtractTasks(id);
-      addLog(`[AI Engine] 업무 분해 완료. 배분 대기열에 추가됨.`, 'success');
-    }, 1200);
+  const handleExtractTasks = (id: string) => {
+    approveProposalAndExtractTasks(id);
   };
 
   const handleRejectProposal = (id: string, title: string) => {
@@ -54,22 +33,18 @@ export default function Pipeline() {
   };
 
   const handleApproveDistribution = (t: { id: string; title: string }) => {
-    addLog(`[Allocator] ${t.title} 담당자 배정 처리 중...`, 'info');
     if (employees.length === 0) return;
-    setTimeout(() => {
-      const recommendedEmp = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
-      const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
-      const bestEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
-      
-      approveDistribution(t.id, bestEmp.id);
-      addLog(`[PM 결재 완료] ${t.title} → ${bestEmp.name} 배정 (부하: ${bestEmp.currentWorkload}%)`, 'success');
-      
-      setManualAssignees(prev => {
-        const next = { ...prev };
-        delete next[t.id];
-        return next;
-      });
-    }, 800);
+    const recommendedEmp = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
+    const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
+    const bestEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
+
+    approveDistribution(t.id, bestEmp.id);
+
+    setManualAssignees(prev => {
+      const next = { ...prev };
+      delete next[t.id];
+      return next;
+    });
   };
 
   const handleRejectDistribution = (id: string, title: string) => {
@@ -81,37 +56,23 @@ export default function Pipeline() {
     if (!rejectModal || !rejectReason.trim()) return;
     if (rejectModal.type === 'proposal') {
       rejectProposal(rejectModal.id, rejectReason.trim());
-      addLog(`[반려] 기획서 반려됨: ${rejectModal.title}. 사유: ${rejectReason}`, 'warning');
     } else {
       rejectDistribution(rejectModal.id, rejectReason.trim());
-      addLog(`[반려] 배분 반려됨: ${rejectModal.title}. 사유: ${rejectReason}`, 'warning');
     }
     setRejectModal(null);
     setRejectReason('');
   };
 
   const handleSimulateDelay = (t: { id: string; title: string }) => {
-    addLog(`[지연 감지] ${t.title} - 임계치 초과. 사유 수집 시작.`, 'warning');
-    setTimeout(() => {
-      reportDelay(t.id, '기술 검토 지연 및 리소스 부족');
-      addLog(`[Delay Logger] 지연 사유 기록 완료. AI 재조정 대기.`, 'warning');
-    }, 600);
+    reportDelay(t.id, '기술 검토 지연 및 리소스 부족');
   };
 
   const handleReallocate = (t: { id: string; title: string }) => {
-    addLog(`[AI Re-allocator] ${t.title} - 대체 인력 분석 중...`, 'info');
-    setTimeout(() => {
-      reallocateTask(t.id);
-      addLog(`[PM 결재 완료] AI 재조정안 승인. 재배정 완료.`, 'success');
-    }, 1000);
+    reallocateTask(t.id);
   };
 
-  const handleCompleteTask = (id: string, title: string) => {
-    addLog(`[QA] 완료 요청 검토 중: ${title}`, 'info');
-    setTimeout(() => {
-      updateTaskStatus(id, 'shipped');
-      addLog(`[Deploy] 최종 완료 처리 및 결재함 기록 완료: ${title}`, 'success');
-    }, 600);
+  const handleCompleteTask = (id: string) => {
+    updateTaskStatus(id, 'shipped');
   };
 
   const columns = [
@@ -230,7 +191,7 @@ export default function Pipeline() {
                   {m.summary.slice(0, 3).join(' ')}
                 </p>
                 <button
-                  onClick={() => handleGenerateProposal(m.id, m.title)}
+                  onClick={() => handleGenerateProposal(m.id)}
                   className="w-full py-2 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
                 >
                   <BrainCircuit className="w-3.5 h-3.5" /> AI 요약 및 기획서 생성
@@ -278,7 +239,7 @@ export default function Pipeline() {
                       <AlertCircle className="w-3 h-3" /> 반려
                     </button>
                     <button
-                      onClick={() => handleExtractTasks(m.id, m.title)}
+                      onClick={() => handleExtractTasks(m.id)}
                       className="flex-[2] py-2 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
                     >
                       <BrainCircuit className="w-3.5 h-3.5" /> 검토완료 → 배분 요청
@@ -433,7 +394,7 @@ export default function Pipeline() {
                         <button onClick={() => handleSimulateDelay(t)} className="flex-1 py-2 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1">
                           ⚠ 지연 테스트
                         </button>
-                        <button onClick={() => handleCompleteTask(t.id, t.title)} className="flex-[2] py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
+                        <button onClick={() => handleCompleteTask(t.id)} className="flex-[2] py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> 완료 처리
                         </button>
                       </>
@@ -468,27 +429,6 @@ export default function Pipeline() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </div>
-
-      {/* Terminal Log */}
-      <div className="h-40 bg-[#1a1a2e] border-t-2 border-blue-600 shrink-0 flex flex-col font-mono">
-        <div className="bg-[#16213e] px-4 py-2 flex items-center justify-between border-b border-blue-900">
-          <div className="text-gray-300 text-[10px] font-bold flex items-center gap-2"><Terminal className="w-3.5 h-3.5 text-blue-400" /> Hey Zzabi AI Event Stream</div>
-          <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500" /><div className="w-2.5 h-2.5 rounded-full bg-green-500" /></div>
-        </div>
-        <div className="flex-1 p-3 overflow-y-auto space-y-0.5">
-          {logs.map(log => (
-            <div key={log.id} className="text-[10px] flex gap-2">
-              <span className="text-gray-600 shrink-0">[{log.time}]</span>
-              <span className={cn(log.type === 'info' ? 'text-gray-400' : log.type === 'success' ? 'text-green-400' : log.type === 'warning' ? 'text-yellow-400' : 'text-red-400')}>
-                {log.message}
-              </span>
-            </div>
-          ))}
-          <div className="text-[10px] text-blue-500 flex items-center gap-1 mt-1 animate-pulse">
-            <ChevronRight className="w-3 h-3" /> Waiting for Manager Action...
           </div>
         </div>
       </div>
