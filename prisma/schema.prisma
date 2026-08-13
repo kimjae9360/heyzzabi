@@ -4,7 +4,8 @@
 // docs/superpowers/specs/2026-08-13-heyzzabi-realbackend-design.md).
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

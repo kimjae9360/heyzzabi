@@ -1,7 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { createClient } from '@libsql/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+// TURSO_DATABASE_URL이 있으면 원격 Turso DB에 시드한다 (배포용 DB 초기 세팅).
+// 없으면 기존처럼 로컬 dev.db에 시드한다.
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const prisma = tursoUrl
+  ? new PrismaClient({ adapter: new PrismaLibSQL(createClient({ url: tursoUrl, authToken: process.env.TURSO_AUTH_TOKEN })) })
+  : new PrismaClient();
 
 async function main() {
   const passwordHash = await bcrypt.hash('zzabi1234!', 10);
