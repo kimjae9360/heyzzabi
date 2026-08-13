@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Mic, FileText, CheckSquare, Search, Download, Share2, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle, Upload, Paperclip } from 'lucide-react';
+import { Mic, FileText, CheckSquare, Search, Download, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle, Upload, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
 type MeetingTab = 'raw' | 'analysis' | 'proposal';
 
 export default function Meetings() {
-  const { meetings = [], generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {} } = useAppStore();
+  const { meetings = [], generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<MeetingTab>('raw');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -260,8 +260,15 @@ export default function Meetings() {
                   <h1 className="text-xl font-black text-gray-900 tracking-tight">{selectedMeeting.title}</h1>
                 </div>
                 <div className="flex gap-1.5 ml-4 shrink-0">
-                  <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"><Share2 className="w-4 h-4" /></button>
-                  <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"><Download className="w-4 h-4" /></button>
+                  {selectedMeeting.hasProposal && (
+                    <button
+                      onClick={() => downloadPPT(selectedMeeting.id)}
+                      title="기획서 PPTX 다운로드"
+                      className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  )}
                   <button onClick={() => handleDelete(selectedMeeting.id)} className="p-2 border border-red-100 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>

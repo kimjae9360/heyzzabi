@@ -5,7 +5,12 @@ import { toMeetingDTO } from '@/lib/serializers';
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await prisma.meeting.delete({ where: { meeting_id: id } });
+    // KnowledgeChunk는 회의록을 임베딩 인덱싱한 파생 데이터라, 함께 지우지 않으면
+    // 챗봇/검색이 이미 삭제된 회의록을 계속 근거 문서로 답하는 유령 참조가 남는다.
+    await prisma.$transaction([
+      prisma.knowledgeChunk.deleteMany({ where: { source_type: 'MEETING', source_id: id } }),
+      prisma.meeting.delete({ where: { meeting_id: id } }),
+    ]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : '회의록 삭제에 실패했습니다.' }, { status: 500 });

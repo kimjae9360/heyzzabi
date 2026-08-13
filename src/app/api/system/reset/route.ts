@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
       prisma.notification.deleteMany(),
       prisma.taskAssignmentLog.deleteMany(),
       prisma.task.deleteMany(),
+      // KnowledgeChunk는 Meeting/Planning을 임베딩 인덱싱한 파생 데이터라 함께 지우지 않으면
+      // 챗봇/검색이 이미 삭제된 회의록·기획서를 계속 근거로 답하는 유령 참조가 남는다.
+      prisma.knowledgeChunk.deleteMany({ where: { source_type: { in: ['MEETING', 'PLANNING'] } } }),
       prisma.planning.deleteMany(),
       prisma.meeting.deleteMany(),
     ]);
