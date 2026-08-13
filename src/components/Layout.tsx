@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope } from 'lucide-react';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope, Loader2, Sparkles, CornerDownLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
 
@@ -32,6 +32,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [aiAskedQuery, setAiAskedQuery] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiSources, setAiSources] = useState<{ sourceType: string; sourceId: string; title: string }[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -77,7 +82,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const handleSearchResultClick = (link: string) => {
     router.push(link);
     setSearchQuery('');
+    setAiAskedQuery('');
+    setAiAnswer('');
+    setAiError('');
     setIsSearchFocused(false);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setAiAskedQuery('');
+    setAiAnswer('');
+    setAiError('');
+  };
+
+  const handleAskAi = async () => {
+    const q = searchQuery.trim();
+    if (q.length < 2 || aiLoading) return;
+    setAiLoading(true);
+    setAiError('');
+    setAiAnswer('');
+    try {
+      const res = await fetch('/api/search/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '질의에 실패했습니다.');
+      setAiAskedQuery(q);
+      setAiAnswer(data.answer);
+      setAiSources(data.sources || []);
+    } catch (err) {
+      setAiAskedQuery(q);
+      setAiError(err instanceof Error ? err.message : '질의에 실패했습니다.');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   return (
@@ -103,11 +143,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
-                placeholder='자연어 질의: "김개발 업무량은?", "인증 버그 회의록 찾아줘"'
+                onKeyDown={e => e.key === 'Enter' && handleAskAi()}
+                placeholder='자연어 질의: "김개발 업무량은?", "인증 버그 회의록 찾아줘" (Enter로 AI 질의)'
                 className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-700">
+                <button onClick={handleClearSearch} className="text-gray-400 hover:text-gray-700">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -115,36 +156,82 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Search Results Dropdown */}
             {isSearchFocused && (
-              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden max-h-[440px] overflow-y-auto">
                 {searchQuery.length >= 2 ? (
-                  searchResults.length > 0 ? (
-                    <div>
-                      <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        검색 결과 ({searchResults.length}건)
+                  <div>
+                    {/* AI natural-language answer (OpenAI, real DB data — triggered on Enter) */}
+                    {aiAskedQuery === searchQuery.trim() && (aiLoading || aiAnswer || aiError) ? (
+                      <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/60">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black text-blue-700 uppercase tracking-wider mb-1.5">
+                          <Sparkles className="w-3 h-3" /> AI 답변
+                        </div>
+                        {aiLoading ? (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />사내 데이터를 분석해 답변을 생성하는 중...
+                          </div>
+                        ) : aiError ? (
+                          <p className="text-sm text-red-600">{aiError}</p>
+                        ) : (
+                          <>
+                            <p className="text-sm text-gray-800 leading-relaxed">{aiAnswer}</p>
+                            {aiSources.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {aiSources.map((s, i) => (
+                                  <span key={i} className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                                    {s.sourceType === 'MEETING' ? '회의록' : '기획서'}: {s.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                      {searchResults.map((r, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSearchResultClick(r.link)}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                            <r.icon className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-bold text-gray-900 truncate">{r.label}</div>
-                            <div className="text-[10px] text-gray-400">{r.sub}</div>
-                          </div>
-                          <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-6 text-center text-gray-400 text-sm">
-                      <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                      <p>"{searchQuery}"에 해당하는 결과가 없습니다.</p>
-                    </div>
-                  )
+                    ) : (
+                      <button
+                        onClick={handleAskAi}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-blue-50 transition-colors text-left"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="flex-1 text-xs text-gray-600">
+                          &ldquo;<b className="text-gray-900">{searchQuery}</b>&rdquo; AI에게 물어보기
+                        </span>
+                        <span className="flex items-center gap-1 text-[9px] font-bold text-gray-400 bg-white border border-gray-200 rounded px-1.5 py-0.5 shrink-0">
+                          <CornerDownLeft className="w-2.5 h-2.5" />Enter
+                        </span>
+                      </button>
+                    )}
+
+                    {searchResults.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                          제목 일치 결과 ({searchResults.length}건)
+                        </div>
+                        {searchResults.map((r, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSearchResultClick(r.link)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                              <r.icon className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-bold text-gray-900 truncate">{r.label}</div>
+                              <div className="text-[10px] text-gray-400">{r.sub}</div>
+                            </div>
+                            <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {searchResults.length === 0 && !aiAnswer && !aiLoading && !aiError && (
+                      <div className="px-4 py-6 text-center text-gray-400 text-sm">
+                        <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p>제목이 일치하는 결과가 없습니다. Enter를 눌러 AI에게 물어보세요.</p>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="p-4">
                     <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">빠른 이동</div>

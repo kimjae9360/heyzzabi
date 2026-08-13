@@ -16,32 +16,54 @@ function getClient(): OpenAI {
   return client;
 }
 
+// gpt-4o-mini 호출은 파이프라인 한 단계당 2~3번씩 연쇄로 일어나 일시적 429/네트워크 오류 하나가
+// 회의분석->업무배분 전체 흐름을 깨뜨린다. 재시도 불가능한 오류(4xx 등)만 즉시 던지고 나머지는 백오프 재시도한다.
+async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const status = (err as { status?: number } | null)?.status;
+      const retryable = status === 429 || status === undefined || (typeof status === 'number' && status >= 500);
+      if (!retryable || attempt === retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function callJson<T>(system: string, user: string): Promise<T> {
   const openai = getClient();
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  });
+  const completion = await withRetry(() =>
+    openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    })
+  );
   const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error('AI 응답이 비어 있습니다.');
+  if (!content) throw new Error('AI 응답이 비어 있습니다. 잠시 후 다시 시도해 주세요.');
   return JSON.parse(content) as T;
 }
 
 async function callText(system: string, user: string): Promise<string> {
   const openai = getClient();
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  });
+  const completion = await withRetry(() =>
+    openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    })
+  );
   const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error('AI 응답이 비어 있습니다.');
+  if (!content) throw new Error('AI 응답이 비어 있습니다. 잠시 후 다시 시도해 주세요.');
   return content;
 }
 
@@ -96,10 +118,12 @@ export async function classifyDocument(title: string, content: string): Promise<
 
 export async function embedText(text: string): Promise<number[]> {
   const openai = getClient();
-  const result = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text.slice(0, 8000),
-  });
+  const result = await withRetry(() =>
+    openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text.slice(0, 8000),
+    })
+  );
   return result.data[0].embedding;
 }
 
@@ -173,6 +197,50 @@ export async function runDeepResearch(question: string, packet: LocalPacketDoc[]
     : '';
 
   return { content: header + report, degraded };
+}
+
+export interface EmployeeWorkloadRow {
+  name: string;
+  department: string;
+  position: string;
+  jobTitle: string;
+  currentWorkload: number;
+  activeTasks: { title: string; status: string; progress: number; estimatedHours?: number }[];
+}
+
+export interface GlobalSearchAnswer {
+  answer: string;
+}
+
+// 상단 검색바용: 직원 워크로드/업무 현황(구조화 데이터) + 지식망 RAG 검색 결과를 함께 근거로 답한다.
+// "김재원 업무량은?" 같은 질문은 문서 임베딩이 아니라 실시간 Task/User 데이터가 있어야 답할 수 있어 별도 함수로 분리했다.
+export async function answerGlobalSearch(
+  question: string,
+  employeeRows: EmployeeWorkloadRow[],
+  docChunks: { title: string; content: string }[]
+): Promise<GlobalSearchAnswer> {
+  const employeeContext = employeeRows.length > 0
+    ? employeeRows.map((e) => {
+        const tasksText = e.activeTasks.length > 0
+          ? e.activeTasks.map((t) => `  - [${t.status}] ${t.title} (진행률 ${t.progress}%${t.estimatedHours ? `, 예상 ${t.estimatedHours}시간` : ''})`).join('\n')
+          : '  - 배정된 업무 없음';
+        return `${e.name} (${e.department}/${e.position}${e.jobTitle ? `, ${e.jobTitle}` : ''}) - 현재 워크로드 ${e.currentWorkload}/100\n${tasksText}`;
+      }).join('\n\n')
+    : '(등록된 직원 없음)';
+
+  const docContext = docChunks.length > 0
+    ? docChunks.map((c, i) => `[문서 ${i + 1}] ${c.title}\n${c.content.slice(0, 500)}`).join('\n\n')
+    : '(관련 회의록/기획서 없음)';
+
+  const result = await callJson<{ answer: string }>(
+    `당신은 사내 업무 관리 시스템 "Hey Zzabi"의 검색 어시스턴트입니다. 아래 두 종류의 실제 사내 데이터만 근거로 한국어로 답하세요.
+1) 직원별 워크로드/업무 현황 (실시간 DB 스냅샷)
+2) 관련 회의록/기획서 발췌
+
+데이터에 없는 내용은 추측하지 말고 정직하게 "관련 데이터를 찾을 수 없습니다"라고 답하세요. 사람 이름이 언급되면 반드시 직원 현황 데이터에서 찾아 워크로드/업무 개수/진행 중인 업무를 근거로 요약해 답하세요. 답변은 2~4문장으로 간결하게 작성하세요. JSON 형식으로 반환: {"answer": string}`,
+    `직원 워크로드/업무 현황:\n${employeeContext}\n\n관련 문서:\n${docContext}\n\n질문: ${question}`
+  );
+  return result;
 }
 
 // 실제 Whisper 음성 인식 - 음성 파일을 업로드하면 진짜로 텍스트로 변환한다 (연출 아님)
