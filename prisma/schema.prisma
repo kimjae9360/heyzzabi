@@ -181,3 +181,17 @@ model Notification {
   user_id String?
   user    User?   @relation(fields: [user_id], references: [user_id])
 }
+
+// 지식망(Knowledge Base) - 회의록/기획서를 임베딩하여 시맨틱 검색/챗에 사용
+model KnowledgeChunk {
+  chunk_id    String   @id @default(uuid())
+  source_type String // MEETING / PLANNING
+  source_id   String // meeting_id 또는 planning_id
+  title       String
+  content     String
+  embedding   String // JSON-encoded float array (text-embedding-3-small, 1536dim)
+  updated_at  DateTime @updatedAt
+  created_at  DateTime @default(now())
+
+  @@unique([source_type, source_id])
+}

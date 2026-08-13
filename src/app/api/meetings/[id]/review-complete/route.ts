@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { toMeetingDTO } from '@/lib/serializers';
 import { getActingUser } from '@/lib/currentUser';
 import { analyzeMeetingAndDraftProposal, AIConfigError } from '@/lib/openai';
+import { indexMeeting, indexPlanning } from '@/lib/knowledgeIndex';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,6 +60,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       return tx.meeting.findUnique({ where: { meeting_id: id }, include: { plannings: true } });
     });
+
+    const planningId = updated?.plannings[0]?.planning_id;
+    await Promise.all([
+      indexMeeting(id).catch((e) => console.warn('지식망 인덱싱 실패(meeting):', e)),
+      planningId ? indexPlanning(planningId).catch((e) => console.warn('지식망 인덱싱 실패(planning):', e)) : Promise.resolve(),
+    ]);
 
     return NextResponse.json(toMeetingDTO(updated!));
   } catch (err) {
