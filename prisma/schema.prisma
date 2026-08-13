@@ -44,6 +44,7 @@ model User {
   authored_plans       Planning[]           @relation("PlanAuthor")
   approved_plans       Planning[]           @relation("PlanApprover")
   created_projects     Project[]            @relation("ProjectAuthor")
+  connected_integrations IntegrationConnection[]
 }
 
 model Project {
@@ -194,4 +195,15 @@ model KnowledgeChunk {
   created_at  DateTime @default(now())
 
   @@unique([source_type, source_id])
+}
+
+// 외부 툴 연동 (OAuth) - provider 당 팀 전체에 하나의 연결만 유지한다
+model IntegrationConnection {
+  connection_id   String   @id @default(uuid())
+  provider        String   @unique // github / slack / jira / gcal
+  external_login  String // 연동된 외부 계정 표시명
+  access_token    String // OAuth access token (평문 저장 - 로컬 개발용, 운영 전환 시 암호화 필요)
+  connected_by    String
+  connected_user  User     @relation(fields: [connected_by], references: [user_id])
+  connected_at    DateTime @default(now())
 }
