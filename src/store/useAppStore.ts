@@ -199,7 +199,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       const user = await apiFetch<Employee>('/api/auth/me');
       set({ currentUser: user, authChecked: true });
     } catch {
-      set({ currentUser: null, authChecked: true });
+      // 로그인을 사용하지 않는 경우: 표시용으로 기본 관리자를 현재 사용자로 취급한다.
+      // (서버 측 액션은 src/lib/currentUser.ts가 동일한 폴백을 독립적으로 적용한다.)
+      try {
+        const employees = await apiFetch<Employee[]>('/api/employees');
+        const fallback = employees.find(e => e.level === 'pm') || employees[0] || null;
+        set({ currentUser: fallback, authChecked: true });
+      } catch {
+        set({ currentUser: null, authChecked: true });
+      }
     }
   },
 

@@ -1,12 +1,42 @@
 'use client';
 
 import { useState } from 'react';
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
 import Link from 'next/link';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore, type TaskUiStatus } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 
 interface RejectModal { type: 'proposal' | 'distribution'; id: string; title: string; }
+
+// plane 스타일: 카드는 드래그 가능, 컬럼은 드롭 영역. 허용 안 된 이동은 토스트로 막고 스냅백한다.
+function DraggableCard({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
+        zIndex: isDragging ? 50 : undefined,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: 'grab',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={cn("flex-1 overflow-y-auto space-y-3 pb-4 rounded-lg transition-colors", isOver && "bg-blue-50/60 ring-2 ring-blue-300 ring-inset")}>
+      {children}
+    </div>
+  );
+}
 
 export default function Pipeline() {
   const { meetings = [], tasks = [], employees = [], generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
@@ -75,6 +105,38 @@ export default function Pipeline() {
 
   const handleCompleteTask = (id: string) => {
     updateTaskStatus(id, 'shipped');
+  };
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const COLUMN_FOR_STATUS: Record<TaskUiStatus, string> = {
+    'pending-distribution': 'col-distribution',
+    'in-progress': 'col-progress',
+    delayed: 'col-progress',
+    shipped: 'col-done',
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const taskId = String(active.id);
+    const targetColumn = String(over.id);
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const sourceColumn = COLUMN_FOR_STATUS[task.status];
+    if (sourceColumn === targetColumn) return;
+
+    if (sourceColumn === 'col-distribution' && targetColumn === 'col-progress') {
+      handleApproveDistribution(task);
+    } else if (sourceColumn === 'col-progress' && targetColumn === 'col-done') {
+      handleCompleteTask(taskId);
+    } else {
+      setRejectModal(null);
+      useAppStore.getState().setToast(
+        `허용되지 않는 이동입니다: '${task.title}'은(는) 순서를 건너뛸 수 없습니다.`,
+        'warning'
+      );
+    }
   };
 
   const columns = [
@@ -167,6 +229,7 @@ export default function Pipeline() {
       </div>
 
       {/* Kanban */}
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-x-auto p-5 flex gap-4">
 
         {/* Col 1: Meeting Summarization */}
@@ -259,7 +322,7 @@ export default function Pipeline() {
             <h3 className="font-bold text-amber-900 text-xs flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Phase 3. 배분 승인</h3>
             <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{pendingTasks.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-3 pb-4">
+          <DroppableColumn id="col-distribution">
             {pendingTasks.length === 0 && (
               <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs">
                 배분 대기 중인 업무가 없습니다.
@@ -269,9 +332,10 @@ export default function Pipeline() {
               const recommendedEmp = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
               const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
               const selectedEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
-              
+
               return (
-                <div key={t.id} className={cn(
+                <DraggableCard key={t.id} id={t.id}>
+                <div className={cn(
                   "bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-amber-400 border-y border-r border-y-gray-100 border-r-gray-100 hover:shadow-md transition-all",
                   t.rejectedReason && "border-l-red-400"
                 )}>
@@ -332,9 +396,10 @@ export default function Pipeline() {
                     </button>
                   </div>
                 </div>
+                </DraggableCard>
               );
             })}
-          </div>
+          </DroppableColumn>
         </div>
 
         {/* Col 4: Active/Delayed */}
@@ -343,7 +408,7 @@ export default function Pipeline() {
             <h3 className="font-bold text-emerald-900 text-xs flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> Phase 4. 진행 추적</h3>
             <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{activeTasks.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-3 pb-4">
+          <DroppableColumn id="col-progress">
             {activeTasks.length === 0 && (
               <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs">
                 진행 중인 업무가 없습니다.
@@ -353,7 +418,8 @@ export default function Pipeline() {
               const assignee = employees.find(e => e.id === t.assigneeId);
               const isDelayed = t.status === 'delayed';
               return (
-                <div key={t.id} className={cn(
+                <DraggableCard key={t.id} id={t.id}>
+                <div className={cn(
                   "bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-y-gray-100 border-r-gray-100 hover:shadow-md transition-all",
                   isDelayed ? "border-l-red-500 bg-red-50/30" : "border-l-emerald-500"
                 )}>
@@ -403,9 +469,10 @@ export default function Pipeline() {
                     )}
                   </div>
                 </div>
+                </DraggableCard>
               );
             })}
-          </div>
+          </DroppableColumn>
         </div>
 
         {/* Col 5: Completed */}
@@ -414,9 +481,9 @@ export default function Pipeline() {
             <h3 className="font-bold text-gray-700 text-xs flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Phase 5. 완료됨</h3>
             <span className="bg-gray-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{shippedTasks.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-3 pb-4 opacity-70">
+          <DroppableColumn id="col-done">
             {shippedTasks.length === 0 && (
-              <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs">완료된 업무가 없습니다.</div>
+              <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs">완료된 업무가 없습니다. (진행 카드를 여기로 끌어와 완료 처리할 수 있습니다)</div>
             )}
             {shippedTasks.map((t) => {
               const assignee = employees.find(e => e.id === t.assigneeId);
@@ -431,9 +498,10 @@ export default function Pipeline() {
                 </div>
               );
             })}
-          </div>
+          </DroppableColumn>
         </div>
       </div>
+      </DndContext>
     </div>
   );
 }
