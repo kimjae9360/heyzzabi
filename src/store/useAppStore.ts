@@ -49,17 +49,28 @@ export interface Task {
   dueDate?: string;
 }
 
+export type EmployeeStatus = 'ACTIVE' | 'LEAVE' | 'RESIGNED' | 'LOCKED';
+
 export interface Employee {
-  id: string;
+  id: string;               // user_id / 사번
+  employeeNo: string;       // 사원번호
   name: string;
-  role: string;
-  department?: string;
-  skills?: string[];
+  email: string;            // 회사 이메일
+  phone?: string;           // 연락처
+  department: string;       // 부서 (department_id)
+  position: string;         // 직급 (position_id) - 사원/대리/과장/부장 등
+  role: string;             // 직무 - Frontend/Backend/Designer/PM 등
+  level: 'member' | 'lead' | 'pm'; // 시스템 권한 (role) - 직원/팀장/관리자
+  status: EmployeeStatus;   // 계정 상태
+  hireDate?: string;        // 입사일
+  profileImage?: string;    // 프로필 이미지
+  lastLoginAt?: string;     // 최근 로그인
+  skills?: string[];        // 기술 스택 (stack)
   certifications?: string[];
   pastProjects?: string[];
   currentWorkload: number;
   avatar: string;
-  level?: 'member' | 'lead' | 'pm';
+  createdAt: string;        // 가입일
 }
 
 interface AppState {
@@ -95,7 +106,8 @@ interface AppState {
   updateTaskProgress: (taskId: string, progress: number) => void;
 
   // Employees
-  addEmployee: (emp: Omit<Employee, 'id' | 'currentWorkload' | 'avatar'>) => void;
+  addEmployee: (emp: Omit<Employee, 'id' | 'currentWorkload' | 'avatar' | 'employeeNo' | 'createdAt'>) => void;
+  updateEmployee: (empId: string, patch: Partial<Omit<Employee, 'id'>>) => void;
   removeEmployee: (empId: string) => void;
 
   // Notifications
@@ -112,10 +124,10 @@ interface AppState {
 }
 
 const INITIAL_EMPLOYEES: Employee[] = [
-  { id: 'e1', name: '김개발', role: 'Frontend', department: '개발팀', skills: ['React', 'TypeScript', 'CSS'], certifications: ['정보처리기사'], pastProjects: ['로그인 시스템 리뉴얼', 'API 연동 모듈'], currentWorkload: 70, avatar: '김', level: 'member' },
-  { id: 'e2', name: '박서버', role: 'Backend', department: '개발팀', skills: ['Node.js', 'Python', 'PostgreSQL', 'AWS'], certifications: ['AWS SAA', '정보처리기사'], pastProjects: ['API 서버 구축', 'DB 최적화 프로젝트'], currentWorkload: 40, avatar: '박', level: 'lead' },
-  { id: 'e3', name: '이디자인', role: 'UI/UX Designer', department: '디자인팀', skills: ['Figma', 'Illustrator', 'Prototyping'], certifications: ['GTQ'], pastProjects: ['모바일앱 디자인', '브랜드 가이드라인'], currentWorkload: 55, avatar: '이', level: 'member' },
-  { id: 'e4', name: '최PM', role: 'Project Manager', department: '기획팀', skills: ['Agile', 'JIRA', 'Roadmapping'], certifications: ['PMP'], pastProjects: ['V1.0 런치', '파이프라인 기획'], currentWorkload: 90, avatar: '최', level: 'pm' },
+  { id: 'e1', employeeNo: 'EMP-2023-001', name: '김개발', email: 'kim.dev@heyzzabi.com', phone: '010-1234-5601', role: 'Frontend', department: '개발팀', position: '대리', skills: ['React', 'TypeScript', 'CSS'], certifications: ['정보처리기사'], pastProjects: ['로그인 시스템 리뉴얼', 'API 연동 모듈'], currentWorkload: 70, avatar: '김', level: 'member', status: 'ACTIVE', hireDate: '2023-03-02', lastLoginAt: '2026-08-12 09:12', createdAt: '2023-03-02' },
+  { id: 'e2', employeeNo: 'EMP-2021-014', name: '박서버', email: 'park.server@heyzzabi.com', phone: '010-1234-5602', role: 'Backend', department: '개발팀', position: '과장', skills: ['Node.js', 'Python', 'PostgreSQL', 'AWS'], certifications: ['AWS SAA', '정보처리기사'], pastProjects: ['API 서버 구축', 'DB 최적화 프로젝트'], currentWorkload: 40, avatar: '박', level: 'lead', status: 'ACTIVE', hireDate: '2021-07-19', lastLoginAt: '2026-08-13 08:45', createdAt: '2021-07-19' },
+  { id: 'e3', employeeNo: 'EMP-2022-032', name: '이디자인', email: 'lee.design@heyzzabi.com', phone: '010-1234-5603', role: 'UI/UX Designer', department: '디자인팀', position: '사원', skills: ['Figma', 'Illustrator', 'Prototyping'], certifications: ['GTQ'], pastProjects: ['모바일앱 디자인', '브랜드 가이드라인'], currentWorkload: 55, avatar: '이', level: 'member', status: 'ACTIVE', hireDate: '2022-05-10', lastLoginAt: '2026-08-11 17:30', createdAt: '2022-05-10' },
+  { id: 'e4', employeeNo: 'EMP-2019-003', name: '최PM', email: 'choi.pm@heyzzabi.com', phone: '010-1234-5604', role: 'Project Manager', department: '기획팀', position: '부장', skills: ['Agile', 'JIRA', 'Roadmapping'], certifications: ['PMP'], pastProjects: ['V1.0 런치', '파이프라인 기획'], currentWorkload: 90, avatar: '최', level: 'pm', status: 'ACTIVE', hireDate: '2019-01-14', lastLoginAt: '2026-08-13 09:02', createdAt: '2019-01-14' },
 ];
 
 const INITIAL_MEETINGS: Meeting[] = [
@@ -520,10 +532,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: Math.max(0, Math.min(100, progress)) } : t),
   })),
 
-  addEmployee: (emp) => set((state) => ({
-    employees: [...state.employees, { ...emp, id: `e_${Date.now()}`, currentWorkload: 0, avatar: emp.name[0] }],
-    toast: { message: `${emp.name}님이 팀에 등록되었습니다.`, type: 'success' },
-  })),
+  addEmployee: (emp) => set((state) => {
+    const seq = state.employees.length + 1;
+    const employeeNo = `EMP-${new Date().getFullYear()}-${String(seq).padStart(3, '0')}`;
+    return {
+      employees: [...state.employees, {
+        ...emp,
+        id: `e_${Date.now()}`,
+        employeeNo,
+        currentWorkload: 0,
+        avatar: emp.name[0],
+        createdAt: new Date().toISOString().slice(0, 10),
+      }],
+      toast: { message: `${emp.name}님이 팀에 등록되었습니다. (사원번호: ${employeeNo})`, type: 'success' },
+    };
+  }),
+
+  updateEmployee: (empId, patch) => set((state) => {
+    const target = state.employees.find(e => e.id === empId);
+    return {
+      employees: state.employees.map(e => e.id === empId ? { ...e, ...patch, avatar: patch.name ? patch.name[0] : e.avatar } : e),
+      toast: target ? { message: `${target.name}님의 정보가 수정되었습니다.`, type: 'success' } : null,
+    };
+  }),
 
   removeEmployee: (empId) => set((state) => ({
     employees: state.employees.filter(e => e.id !== empId),

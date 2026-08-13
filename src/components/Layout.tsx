@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network } from 'lucide-react';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/useAppStore';
 
@@ -9,6 +9,7 @@ const globalNavItems = [
   { name: '회의분석', path: '/meetings', icon: Mic2 },
   { name: '업무관리', path: '/pipeline', icon: Briefcase },
   { name: '결재함', path: '/approvals', icon: CheckSquare },
+  { name: '직원관리', path: '/employees', icon: Users },
   { name: '지식망', path: '/knowledge', icon: Network },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },

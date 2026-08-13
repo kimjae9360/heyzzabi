@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { UserPlus, Users, Settings as SettingsIcon, Save, Trash2, Shield, AlertTriangle, Lock, Info } from 'lucide-react';
+import { Settings as SettingsIcon, Trash2, Shield, AlertTriangle, Lock, Info, Users2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { cn } from '../lib/utils';
 
-type Tab = 'employees' | 'permissions' | 'system';
+type Tab = 'permissions' | 'system';
 
 const ROLE_PERMISSIONS = [
   { role: '전직원 (Member)', desc: '기본 열람 및 검색', permissions: ['회의록 읽기', '업무 현황 조회', '자연어 검색'], color: 'gray' },
@@ -12,42 +13,10 @@ const ROLE_PERMISSIONS = [
 ];
 
 export default function Settings() {
-  const { employees = [], addEmployee, removeEmployee, resetStore } = useAppStore();
-  const [activeTab, setActiveTab] = useState<Tab>('employees');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const [name, setName] = useState('');
-  const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
-  const [skillsStr, setSkillsStr] = useState('');
-  const [certsStr, setCertsStr] = useState('');
-  const [projectsStr, setProjectsStr] = useState('');
-  const [level, setLevel] = useState<'member' | 'lead' | 'pm'>('member');
-
-  const handleAddEmployee = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !department || !role) return;
-    addEmployee({
-      name, department, role, level,
-      skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-      certifications: certsStr.split(',').map(s => s.trim()).filter(Boolean),
-      pastProjects: projectsStr.split(',').map(s => s.trim()).filter(Boolean),
-    });
-    setName(''); setDepartment(''); setRole(''); setSkillsStr(''); setCertsStr(''); setProjectsStr(''); setLevel('member');
-  };
-
-  const handleRemove = (id: string) => {
-    if (confirmDeleteId === id) {
-      removeEmployee(id);
-      setConfirmDeleteId(null);
-    } else {
-      setConfirmDeleteId(id);
-      setTimeout(() => setConfirmDeleteId(null), 4000);
-    }
-  };
+  const { employees = [], resetStore } = useAppStore();
+  const [activeTab, setActiveTab] = useState<Tab>('permissions');
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'employees', label: '팀원 관리' },
     { key: 'permissions', label: '권한 구조' },
     { key: 'system', label: '시스템 설정' },
   ];
@@ -59,7 +28,7 @@ export default function Settings() {
         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <SettingsIcon className="w-5 h-5 text-gray-700" /> 관리자 설정
         </h2>
-        <p className="text-gray-500 text-xs mt-0.5">팀원 데이터 등록, 권한 구조 확인, 시스템 환경 설정을 관리합니다.</p>
+        <p className="text-gray-500 text-xs mt-0.5">권한 구조 확인 및 시스템 환경 설정을 관리합니다. 팀원 등록/수정은 <Link to="/employees" className="text-blue-600 font-bold hover:underline">직원관리</Link> 메뉴로 이동했습니다.</p>
         <div className="flex gap-1 mt-4">
           {tabs.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
@@ -74,123 +43,19 @@ export default function Settings() {
 
       <div className="flex-1 overflow-y-auto p-6">
 
-        {/* Tab: 팀원 관리 */}
-        {activeTab === 'employees' && (
-          <div className="max-w-6xl mx-auto flex gap-6">
-            {/* Form */}
-            <div className="w-72 shrink-0">
-              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm">
-                  <UserPlus className="w-4 h-4 text-blue-600" /> 새 팀원 등록
-                </h3>
-                <form onSubmit={handleAddEmployee} className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">이름 *</label>
-                    <input required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="홍길동" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-600 mb-1">부서 *</label>
-                      <input required value={department} onChange={e => setDepartment(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="개발팀" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-600 mb-1">직무 *</label>
-                      <input required value={role} onChange={e => setRole(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="Frontend" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">권한 레벨</label>
-                    <select value={level} onChange={e => setLevel(e.target.value as 'member' | 'lead' | 'pm')} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
-                      <option value="member">전직원 (Member)</option>
-                      <option value="lead">팀장 (Lead)</option>
-                      <option value="pm">PM (Admin)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">보유 스킬 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                    <input value={skillsStr} onChange={e => setSkillsStr(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="React, TypeScript" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">자격증 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                    <input value={certsStr} onChange={e => setCertsStr(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="정보처리기사" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">주요 프로젝트 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                    <textarea value={projectsStr} onChange={e => setProjectsStr(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none bg-gray-50 focus:bg-white" placeholder="API 서버 구축" />
-                  </div>
-                  <button type="submit" className="w-full bg-gray-900 hover:bg-black text-white font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-1.5 shadow-sm">
-                    <Save className="w-3.5 h-3.5" /> 등록
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Employee List */}
-            <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-fit">
-              <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 flex items-center gap-2">
-                <Users className="w-4 h-4 text-gray-500" />
-                <span className="font-bold text-gray-900 text-sm">등록된 팀원</span>
-                <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded-full">{employees.length}명</span>
-              </div>
-              {employees.length === 0 ? (
-                <div className="py-16 text-center text-gray-400">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                  <p className="text-sm">팀원을 등록하세요.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {employees.map(emp => (
-                    <div key={emp.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-base shrink-0">{emp.avatar}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-gray-900 text-sm">{emp.name}</span>
-                          <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{emp.department}</span>
-                          <span className="text-[9px] text-gray-400 font-medium">{emp.role}</span>
-                          <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded",
-                            emp.level === 'pm' ? "bg-indigo-100 text-indigo-700" :
-                            emp.level === 'lead' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
-                          )}>
-                            {emp.level === 'pm' ? 'PM' : emp.level === 'lead' ? 'Lead' : 'Member'}
-                          </span>
-                        </div>
-                        {emp.skills && emp.skills.length > 0 && (
-                          <div className="flex gap-1 flex-wrap mt-1">
-                            {emp.skills.slice(0, 4).map((s, i) => (
-                              <span key={i} className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 font-bold">{s}</span>
-                            ))}
-                            {emp.skills.length > 4 && <span className="text-[9px] text-gray-400">+{emp.skills.length - 4}</span>}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0 mr-2">
-                        <div className="text-[9px] font-bold text-gray-400 mb-1">워크로드</div>
-                        <div className={cn("text-sm font-black",
-                          emp.currentWorkload > 80 ? 'text-red-600' : emp.currentWorkload > 60 ? 'text-amber-600' : 'text-emerald-600'
-                        )}>{emp.currentWorkload}%</div>
-                      </div>
-                      <button
-                        onClick={() => handleRemove(emp.id)}
-                        className={cn("p-2 rounded-lg transition-all text-xs font-bold",
-                          confirmDeleteId === emp.id
-                            ? "bg-red-100 text-red-700 border border-red-200 hover:bg-red-200"
-                            : "text-gray-300 hover:text-red-500 hover:bg-red-50"
-                        )}
-                        title={confirmDeleteId === emp.id ? '한 번 더 클릭하면 삭제됩니다' : '삭제'}
-                      >
-                        {confirmDeleteId === emp.id ? '확인?' : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Tab: 권한 구조 */}
         {activeTab === 'permissions' && (
           <div className="max-w-4xl mx-auto space-y-4">
+            <Link to="/employees" className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3 shadow-sm hover:border-blue-300 hover:bg-blue-50/40 transition-colors group">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center"><Users2 className="w-4 h-4" /></div>
+                <div>
+                  <div className="text-sm font-bold text-gray-900">등록된 직원 {employees.length}명</div>
+                  <div className="text-[11px] text-gray-400">직원관리 페이지에서 등록/수정/삭제</div>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-blue-600 group-hover:underline">바로가기 →</span>
+            </Link>
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
               <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
