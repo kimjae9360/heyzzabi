@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown } from 'lucide-react';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
 
@@ -23,7 +23,7 @@ const LEVEL_RANK: Record<Employee['level'], number> = { member: 0, lead: 1, pm: 
 const LEVEL_LABEL: Record<Employee['level'], string> = { member: '직원', lead: '팀장', pm: '관리자' };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], employees = [], fetchData, activeUserId, setActiveUser } = useAppStore();
+  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData, currentUser, fetchCurrentUser, logout } = useAppStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -37,15 +37,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const pendingApprovals = tasks.filter(t => t.status === 'pending-distribution').length;
-  const activeUser = employees.find(e => e.id === activeUserId);
-  const activeLevel = activeUser?.level ?? 'member';
+  const activeLevel = currentUser?.level ?? 'member';
 
   const visibleNavItems = globalNavItems.filter(item => !item.minLevel || LEVEL_RANK[activeLevel] >= LEVEL_RANK[item.minLevel]);
 
-  // Initial API Fetch
   useEffect(() => {
+    fetchCurrentUser();
     fetchData();
-  }, [fetchData]);
+  }, [fetchCurrentUser, fetchData]);
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -225,41 +224,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="w-px h-5 bg-gray-200 mx-1" />
 
-          {/* User Badge / Role Switcher (로그인 연동 전 임시: 보기 권한 전환) */}
+          {/* User Badge */}
           <div ref={userMenuRef} className="relative">
             <button
               onClick={() => setIsUserMenuOpen(v => !v)}
               className="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <div className="text-right hidden sm:block">
-                <div className="text-gray-900 font-bold text-xs leading-tight">{activeUser?.name || '사용자 선택'}</div>
-                <div className="text-gray-400 text-[9px]">{LEVEL_LABEL[activeLevel]} · {activeUser?.role || '-'}</div>
+                <div className="text-gray-900 font-bold text-xs leading-tight">{currentUser?.name || '...'}</div>
+                <div className="text-gray-400 text-[9px]">{LEVEL_LABEL[activeLevel]} · {currentUser?.role || '-'}</div>
               </div>
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
-                {activeUser?.avatar || '?'}
+                {currentUser?.avatar || '?'}
               </div>
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </button>
             {isUserMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-                <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                  보기 권한 전환 (로그인 연동 전 임시)
+              <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <div className="text-sm font-bold text-gray-900">{currentUser?.name}</div>
+                  <div className="text-[10px] text-gray-400">{currentUser?.email}</div>
                 </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
-                  {employees.map(emp => (
-                    <button
-                      key={emp.id}
-                      onClick={() => { setActiveUser(emp.id); setIsUserMenuOpen(false); }}
-                      className={cn("w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left", emp.id === activeUserId && "bg-blue-50")}
-                    >
-                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs shrink-0">{emp.avatar}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-gray-900">{emp.name}</div>
-                        <div className="text-[9px] text-gray-400">{LEVEL_LABEL[emp.level]} · {emp.department}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-4 py-3 hover:bg-red-50 text-red-600 transition-colors text-left text-sm font-bold"
+                >
+                  <LogOut className="w-4 h-4" /> 로그아웃
+                </button>
               </div>
             )}
           </div>

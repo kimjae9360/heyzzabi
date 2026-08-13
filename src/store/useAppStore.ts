@@ -86,12 +86,11 @@ const DB_TASK_STATUS_TO_UI: Record<string, TaskUiStatus | null> = {
   CANCELLED: null, // 칸반에서 제외
 };
 
-async function apiFetch<T>(url: string, options: RequestInit = {}, activeUserId?: string | null): Promise<T> {
+async function apiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(activeUserId ? { 'x-user-id': activeUserId } : {}),
       ...options.headers,
     },
   });
@@ -109,8 +108,10 @@ interface AppState {
   employees: Employee[];
   notifications: Notification[];
 
-  activeUserId: string | null;
-  setActiveUser: (id: string) => void;
+  currentUser: Employee | null;
+  authChecked: boolean;
+  fetchCurrentUser: () => Promise<void>;
+  logout: () => Promise<void>;
 
   loading: boolean;
   toast: { message: string; type: 'success' | 'info' | 'warning' | 'error' } | null;
@@ -188,11 +189,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   tasks: [],
   employees: [],
   notifications: [],
-  activeUserId: null,
+  currentUser: null,
+  authChecked: false,
   loading: false,
   toast: null,
 
-  setActiveUser: (id) => set({ activeUserId: id }),
+  fetchCurrentUser: async () => {
+    try {
+      const user = await apiFetch<Employee>('/api/auth/me');
+      set({ currentUser: user, authChecked: true });
+    } catch {
+      set({ currentUser: null, authChecked: true });
+    }
+  },
+
+  logout: async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    set({ currentUser: null });
+    window.location.href = '/login';
+  },
 
   fetchData: async () => {
     set({ loading: true });
@@ -209,7 +224,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         employees,
         notifications,
         loading: false,
-        activeUserId: get().activeUserId || employees.find(e => e.level === 'pm')?.id || employees[0]?.id || null,
       });
     } catch (err) {
       set({ loading: false, toast: { message: err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.', type: 'error' } });
@@ -218,7 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addMeeting: async ({ title, content }) => {
     try {
-      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content }) }, get().activeUserId);
+      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content }) });
       await get().fetchData();
       set({ toast: { message: '회의록이 등록되었습니다.', type: 'success' } });
     } catch (err) {
@@ -228,7 +242,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteMeeting: async (meetingId) => {
     try {
-      await apiFetch(`/api/meetings/${meetingId}`, { method: 'DELETE' }, get().activeUserId);
+      await apiFetch(`/api/meetings/${meetingId}`, { method: 'DELETE' });
       set(state => ({ meetings: state.meetings.filter(m => m.id !== meetingId), toast: { message: '회의록이 삭제되었습니다.', type: 'info' } }));
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '회의록 삭제에 실패했습니다.', type: 'error' } });
@@ -238,7 +252,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   generateProposal: async (meetingId) => {
     try {
       set({ toast: { message: 'AI가 회의록을 분석해 기획서를 작성하고 있습니다...', type: 'info' } });
-      await apiFetch(`/api/meetings/${meetingId}/review-complete`, { method: 'POST' }, get().activeUserId);
+      await apiFetch(`/api/meetings/${meetingId}/review-complete`, { method: 'POST' });
       await get().fetchData();
       set({ toast: { message: 'AI 기획서 초안이 생성되었습니다. 내용을 검토해 주세요.', type: 'success' } });
     } catch (err) {
@@ -250,7 +264,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const meeting = get().meetings.find(m => m.id === meetingId);
     if (!meeting) return;
     try {
-      await apiFetch(`/api/meetings/${meetingId}`, { method: 'PATCH', body: JSON.stringify({}) }, get().activeUserId);
+      await apiFetch(`/api/meetings/${meetingId}`, { method: 'PATCH', body: JSON.stringify({}) });
       set(state => ({ meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m) }));
     } catch {
       // editProposal은 로컬 편집 상태만 반영 (저장은 별도 planning PATCH 라우트 필요 시 확장)
@@ -267,7 +281,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const fresh = await apiFetch<MeetingApiDTO[]>('/api/meetings');
       const target = fresh.find(m => m.id === meetingId);
       if (!target?.proposalId) throw new Error('반려할 기획서를 찾을 수 없습니다.');
-      await apiFetch(`/api/plannings/${target.proposalId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await apiFetch(`/api/plannings/${target.proposalId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
       await get().fetchData();
       set({ toast: { message: '기획서가 반려되었습니다.', type: 'warning' } });
     } catch (err) {
@@ -298,7 +312,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const fresh = await apiFetch<MeetingApiDTO[]>('/api/meetings');
       const target = fresh.find(m => m.id === meetingId);
       if (!target?.proposalId) throw new Error('배분할 기획서를 찾을 수 없습니다.');
-      const tasks = await apiFetch<TaskApiDTO[]>(`/api/plannings/${target.proposalId}/approve`, { method: 'POST' }, get().activeUserId);
+      const tasks = await apiFetch<TaskApiDTO[]>(`/api/plannings/${target.proposalId}/approve`, { method: 'POST' });
       await get().fetchData();
       set({ toast: { message: `${tasks.length}개의 업무가 파이프라인 배분 대기열에 추가되었습니다.`, type: 'success' } });
     } catch (err) {
@@ -308,7 +322,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   approveDistribution: async (taskId, assigneeId) => {
     try {
-      await apiFetch(`/api/tasks/${taskId}/approve-distribution`, { method: 'POST', body: JSON.stringify({ assigneeId }) }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}/approve-distribution`, { method: 'POST', body: JSON.stringify({ assigneeId }) });
       await get().fetchData();
       set({ toast: { message: '업무가 배정되었습니다.', type: 'success' } });
     } catch (err) {
@@ -318,7 +332,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   rejectDistribution: async (taskId, reason) => {
     try {
-      await apiFetch(`/api/tasks/${taskId}/reject-distribution`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}/reject-distribution`, { method: 'POST', body: JSON.stringify({ reason }) });
       await get().fetchData();
       set({ toast: { message: '배분이 반려되었습니다.', type: 'warning' } });
     } catch (err) {
@@ -328,7 +342,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   reportDelay: async (taskId, reason) => {
     try {
-      await apiFetch(`/api/tasks/${taskId}/report-delay`, { method: 'POST', body: JSON.stringify({ reason }) }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}/report-delay`, { method: 'POST', body: JSON.stringify({ reason }) });
       await get().fetchData();
       set({ toast: { message: '지연이 감지되어 기록되었습니다.', type: 'warning' } });
     } catch (err) {
@@ -338,7 +352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   reallocateTask: async (taskId) => {
     try {
-      await apiFetch(`/api/tasks/${taskId}/reallocate`, { method: 'POST' }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}/reallocate`, { method: 'POST' });
       await get().fetchData();
       set({ toast: { message: 'AI 재조정이 완료되었습니다.', type: 'success' } });
     } catch (err) {
@@ -349,7 +363,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateTaskStatus: async (taskId, status) => {
     const dbStatus = status === 'shipped' ? 'DONE' : status === 'in-progress' ? 'IN_PROGRESS' : status === 'delayed' ? 'DELAYED' : 'PENDING_DISTRIBUTION';
     try {
-      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: dbStatus }) }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: dbStatus }) });
       await get().fetchData();
       if (status === 'shipped') set({ toast: { message: '업무가 완료 처리되어 결재함에 기록되었습니다.', type: 'success' } });
     } catch (err) {
@@ -360,7 +374,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateTaskProgress: async (taskId, progress) => {
     set(state => ({ tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: Math.max(0, Math.min(100, progress)) } : t) }));
     try {
-      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ progress }) }, get().activeUserId);
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ progress }) });
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '진행률 저장에 실패했습니다.', type: 'error' } });
     }
@@ -368,9 +382,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addEmployee: async (emp) => {
     try {
-      await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(emp) }, get().activeUserId);
+      const created = await apiFetch<Employee & { tempPassword: string }>('/api/employees', { method: 'POST', body: JSON.stringify(emp) });
       await get().fetchData();
-      set({ toast: { message: `${emp.name}님이 팀에 등록되었습니다.`, type: 'success' } });
+      set({ toast: { message: `${emp.name}님이 등록되었습니다. 초기 비밀번호: ${created.tempPassword} (본인에게 안전하게 전달해 주세요)`, type: 'success' } });
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '직원 등록에 실패했습니다.', type: 'error' } });
     }
@@ -378,7 +392,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateEmployee: async (empId, patch) => {
     try {
-      await apiFetch(`/api/employees/${empId}`, { method: 'PATCH', body: JSON.stringify(patch) }, get().activeUserId);
+      await apiFetch(`/api/employees/${empId}`, { method: 'PATCH', body: JSON.stringify(patch) });
       await get().fetchData();
       set({ toast: { message: '직원 정보가 수정되었습니다.', type: 'success' } });
     } catch (err) {
@@ -388,7 +402,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeEmployee: async (empId) => {
     try {
-      await apiFetch(`/api/employees/${empId}`, { method: 'DELETE' }, get().activeUserId);
+      await apiFetch(`/api/employees/${empId}`, { method: 'DELETE' });
       set(state => ({ employees: state.employees.filter(e => e.id !== empId), toast: { message: '직원이 삭제되었습니다.', type: 'info' } }));
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '직원 삭제에 실패했습니다.', type: 'error' } });

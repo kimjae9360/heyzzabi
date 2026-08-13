@@ -15,10 +15,10 @@ const ROLE_PERMISSIONS = [
 ];
 
 export default function Settings() {
-  const { employees = [], activeUserId, fetchData, setToast } = useAppStore();
+  const { employees = [], currentUser, fetchData, setToast } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('permissions');
   const [resetting, setResetting] = useState(false);
-  const isAdmin = employees.find(e => e.id === activeUserId)?.level === 'pm';
+  const isAdmin = currentUser?.level === 'pm';
 
   const handleReset = async () => {
     if (!window.confirm('모든 회의록/기획서/업무/알림 데이터를 초기화합니다. 직원 데이터는 유지됩니다. 계속할까요?')) return;
