@@ -21,6 +21,7 @@ const MIGRATIONS = [
   '20260813062313_add_integration_connections',
   '20260813064411_add_research_reports',
   '20260813065234_add_knowledge_category',
+  '20260813090000_add_chat_messages',
 ];
 
 async function main() {

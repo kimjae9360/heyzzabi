@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Network, Search, RefreshCw, Send, FileText, FileSignature, Loader2, AlertCircle } from 'lucide-react';
+import { Network, Search, RefreshCw, Send, FileText, FileSignature, Loader2, AlertCircle, MessageSquarePlus } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,7 @@ export default function KnowledgeBase() {
   const isAdmin = currentUser?.level === 'pm';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [asking, setAsking] = useState(false);
   const [reindexing, setReindexing] = useState(false);
@@ -47,9 +48,21 @@ export default function KnowledgeBase() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/knowledge/chat');
+      const data = await res.json();
+      if (Array.isArray(data)) setMessages(data);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadGraph();
-  }, [loadGraph]);
+    loadHistory();
+  }, [loadGraph, loadHistory]);
 
   useEffect(() => {
     const update = () => {
@@ -85,6 +98,13 @@ export default function KnowledgeBase() {
     }
   };
 
+  const handleNewChat = async () => {
+    if (messages.length === 0) return;
+    if (!window.confirm('이전 대화 내역을 모두 지우고 새로 시작하시겠습니까?')) return;
+    await fetch('/api/knowledge/chat', { method: 'DELETE' });
+    setMessages([]);
+  };
+
   const handleReindex = async () => {
     setReindexing(true);
     try {
@@ -109,19 +129,29 @@ export default function KnowledgeBase() {
               <Network className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">사내 지식망 (Knowledge Base)</h1>
+              <h1 className="text-xl font-bold text-gray-900">챗봇</h1>
               <p className="text-xs text-gray-500">회의록/기획서를 임베딩 검색하고 근거 기반으로 질의응답합니다.</p>
             </div>
           </div>
-          {isAdmin && (
-            <button
-              onClick={handleReindex}
-              disabled={reindexing}
-              className="px-3 py-2 bg-gray-900 hover:bg-black text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-60"
-            >
-              <RefreshCw className={cn("w-4 h-4", reindexing && "animate-spin")} /> {reindexing ? '인덱싱 중...' : '전체 재인덱싱'}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={handleNewChat}
+                className="px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors"
+              >
+                <MessageSquarePlus className="w-4 h-4" /> 새 대화
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleReindex}
+                disabled={reindexing}
+                className="px-3 py-2 bg-gray-900 hover:bg-black text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw className={cn("w-4 h-4", reindexing && "animate-spin")} /> {reindexing ? '인덱싱 중...' : '전체 재인덱싱'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -129,7 +159,12 @@ export default function KnowledgeBase() {
         {/* Chat */}
         <div className="w-[420px] shrink-0 border-r border-gray-200 bg-white flex flex-col">
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.length === 0 ? (
+            {historyLoading ? (
+              <div className="text-center text-gray-400 text-sm mt-10">
+                <Loader2 className="w-6 h-6 mx-auto mb-3 animate-spin opacity-40" />
+                이전 대화를 불러오는 중...
+              </div>
+            ) : messages.length === 0 ? (
               <div className="text-center text-gray-400 text-sm mt-10 px-4">
                 <Search className="w-10 h-10 mx-auto mb-3 opacity-20" />
                 <p>회의록/기획서 내용에 대해 자연어로 질문해 보세요.</p>

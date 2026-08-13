@@ -34,12 +34,16 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
   throw lastErr;
 }
 
-async function callJson<T>(system: string, user: string): Promise<T> {
+// temperature 기본값 0.2: 구조화 추출/근거 기반 QA 등 이 함수의 모든 호출부는 "정확히 추출/답변"이
+// 목적이라 기본 temperature(1.0)의 창의성이 오히려 해롭다 - 관련 문서가 있는데도 무작위로
+// "찾을 수 없습니다"라고 답하는 등 재현 안 되는 실패를 유발하는 걸 실측으로 확인함.
+async function callJson<T>(system: string, user: string, temperature = 0.2): Promise<T> {
   const openai = getClient();
   const completion = await withRetry(() =>
     openai.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
+      temperature,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -149,7 +153,11 @@ export async function answerFromContext(question: string, contextChunks: { title
   }
   const context = contextChunks.map((c, i) => `[문서 ${i + 1}] ${c.title}\n${c.content}`).join('\n\n---\n\n');
   const result = await callJson<{ answer: string }>(
-    '당신은 사내 지식망 어시스턴트입니다. 반드시 주어진 문서(JSON 아님, 아래 컨텍스트)의 내용만 근거로 한국어로 답하세요. 문서에 없는 내용은 추측하지 말고 "문서에서 찾을 수 없습니다"라고 답하세요. 답변에 어떤 문서를 참고했는지 언급하세요. JSON 형식으로 반환: {"answer": string}',
+    `당신은 사내 지식망 챗봇입니다. 아래 "컨텍스트"에 나열된 문서만 근거로 한국어로 답하세요.
+질문과 직접 관련된 문서가 하나라도 있으면 그 내용을 요약해 구체적으로 답하고, 어떤 문서 번호를 참고했는지 밝히세요.
+컨텍스트에 관련 없는 문서가 섞여 있어도 무시하고, 관련 있는 문서만 근거로 삼아 답하세요.
+컨텍스트 전체에 질문과 관련된 내용이 전혀 없을 때만 "문서에서 찾을 수 없습니다"라고 답하세요.
+JSON 형식으로 반환: {"answer": string}`,
     `컨텍스트:\n${context}\n\n질문: ${question}`
   );
   return result;

@@ -14,7 +14,7 @@ const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?
   { name: '업무보드', path: '/tasks', icon: ListChecks },
   { name: '결재함', path: '/approvals', icon: CheckSquare, minLevel: 'lead' },
   { name: '직원관리', path: '/employees', icon: Users, minLevel: 'pm' },
-  { name: '지식망', path: '/knowledge', icon: Network },
+  { name: '챗봇', path: '/knowledge', icon: Network },
   { name: 'AI 리서치', path: '/research', icon: Microscope },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },

@@ -47,6 +47,7 @@ model User {
   created_projects     Project[]            @relation("ProjectAuthor")
   connected_integrations IntegrationConnection[]
   research_reports     ResearchReport[]
+  chat_messages        ChatMessage[]
 }
 
 model Project {
@@ -199,6 +200,18 @@ model KnowledgeChunk {
   created_at  DateTime @default(now())
 
   @@unique([source_type, source_id])
+}
+
+// 챗봇(구 지식망 채팅) 히스토리 - 사용자별로 이전 대화가 남아 있어야 하므로 DB에 영속화한다
+model ChatMessage {
+  message_id   String   @id @default(uuid())
+  role         String // user / assistant
+  content      String
+  sources_json String? // assistant 답변의 근거 문서 목록 (JSON, KnowledgeChunk 검색 결과)
+  created_at   DateTime @default(now())
+
+  user_id String
+  user    User   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
 
 // 외부 툴 연동 (OAuth) - provider 당 팀 전체에 하나의 연결만 유지한다
