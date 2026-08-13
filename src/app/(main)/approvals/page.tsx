@@ -4,7 +4,14 @@ import { useState } from 'react';
 import { CheckSquare, Clock, CheckCircle2, AlertTriangle, User, CalendarCheck, X, Users } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore, type Employee } from '@/store/useAppStore';
+import { recommendAssignee } from '@/lib/taskAssignment';
+
+function recommend(title: string, employees: Employee[]) {
+  return recommendAssignee({ title }, employees.map((e) => ({
+    id: e.id, name: e.name, role: e.role, level: e.level, skills: e.skills, pastProjects: e.pastProjects, currentWorkload: e.currentWorkload,
+  })));
+}
 
 export default function Approvals() {
   const { tasks = [], employees = [], approveDistribution, rejectDistribution } = useAppStore();
@@ -21,7 +28,8 @@ export default function Approvals() {
 
   const handleOpenApprove = (taskId: string) => {
     setApproveTargetId(taskId);
-    const best = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
+    const task = tasks.find(t => t.id === taskId);
+    const best = employees.find(e => e.id === recommend(task?.title || '', employees)?.employeeId);
     setSelectedAssigneeId(best?.id || '');
   };
 
@@ -40,6 +48,11 @@ export default function Approvals() {
   };
 
   const approveTask = tasks.find(t => t.id === approveTargetId);
+  const topId = approveTask ? recommend(approveTask.title, employees)?.employeeId : undefined;
+  const rankedEmployees = approveTask
+    ? employees.map(e => ({ emp: e, score: recommendAssignee({ title: approveTask.title }, [{ id: e.id, name: e.name, role: e.role, level: e.level, skills: e.skills, pastProjects: e.pastProjects, currentWorkload: e.currentWorkload }])?.score ?? 0 }))
+        .sort((a, b) => b.score - a.score).map(s => s.emp)
+    : employees;
 
   return (
     <div className="flex flex-col h-full bg-[#f4f5f7]">
@@ -67,7 +80,7 @@ export default function Approvals() {
 
               <p className="text-xs font-bold text-gray-700 mb-3">담당자 선택 (AI 추천순 정렬됨)</p>
               <div className="space-y-2 max-h-56 overflow-y-auto">
-                {[...employees].sort((a, b) => a.currentWorkload - b.currentWorkload).map(emp => (
+                {rankedEmployees.map(emp => (
                   <label key={emp.id} className={cn(
                     "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
                     selectedAssigneeId === emp.id ? "border-blue-400 bg-blue-50 ring-1 ring-blue-300" : "border-gray-200 hover:border-gray-300 bg-white"
@@ -78,7 +91,7 @@ export default function Approvals() {
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-gray-900">{emp.name}</span>
                         <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{emp.role}</span>
-                        {[...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0].id === emp.id && (
+                        {topId === emp.id && (
                           <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">AI 추천</span>
                         )}
                       </div>
@@ -204,7 +217,7 @@ export default function Approvals() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {pendingTasks.map(task => {
-                  const taskEmployees = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload);
+                  const bestMatch = employees.find(e => e.id === recommend(task.title, employees)?.employeeId);
                   return (
                     <div key={task.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
                       <div className="flex-1 min-w-0">
@@ -227,7 +240,7 @@ export default function Approvals() {
                       </div>
                       <div className="shrink-0 flex items-center gap-2 text-xs text-gray-500">
                         <Users className="w-3.5 h-3.5" />
-                        <span className="font-medium">AI 추천: <strong className="text-gray-900">{taskEmployees[0]?.name}</strong> ({taskEmployees[0]?.currentWorkload}%)</span>
+                        <span className="font-medium">AI 추천: <strong className="text-gray-900">{bestMatch?.name}</strong> ({bestMatch?.currentWorkload}%)</span>
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <button

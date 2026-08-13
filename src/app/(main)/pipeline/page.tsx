@@ -4,10 +4,17 @@ import { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
 import Link from 'next/link';
-import { useAppStore, type TaskUiStatus } from '@/store/useAppStore';
+import { useAppStore, type TaskUiStatus, type Employee } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
+import { recommendAssignee } from '@/lib/taskAssignment';
 
 interface RejectModal { type: 'proposal' | 'distribution'; id: string; title: string; }
+
+function recommend(title: string, employees: Employee[]) {
+  return recommendAssignee({ title }, employees.map((e) => ({
+    id: e.id, name: e.name, role: e.role, level: e.level, skills: e.skills, pastProjects: e.pastProjects, currentWorkload: e.currentWorkload,
+  })));
+}
 
 // plane 스타일: 카드는 드래그 가능, 컬럼은 드롭 영역. 허용 안 된 이동은 토스트로 막고 스냅백한다.
 function DraggableCard({ id, children }: { id: string; children: React.ReactNode }) {
@@ -66,9 +73,9 @@ export default function Pipeline() {
 
   const handleApproveDistribution = (t: { id: string; title: string }) => {
     if (employees.length === 0) return;
-    const recommendedEmp = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
+    const recommendedEmp = employees.find(e => e.id === recommend(t.title, employees)?.employeeId);
     const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
-    const bestEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
+    const bestEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp || employees[0];
 
     approveDistribution(t.id, bestEmp.id);
 
@@ -329,7 +336,7 @@ export default function Pipeline() {
               </div>
             )}
             {pendingTasks.map((t) => {
-              const recommendedEmp = [...employees].sort((a, b) => a.currentWorkload - b.currentWorkload)[0];
+              const recommendedEmp = employees.find(e => e.id === recommend(t.title, employees)?.employeeId);
               const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
               const selectedEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
 

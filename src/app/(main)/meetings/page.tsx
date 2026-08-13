@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Mic, FileText, CheckSquare, Search, Download, Share2, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle } from 'lucide-react';
+import { Mic, FileText, CheckSquare, Search, Download, Share2, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle, Upload, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -10,10 +10,9 @@ type MeetingTab = 'raw' | 'analysis' | 'proposal';
 
 export default function Meetings() {
   const { meetings = [], generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {} } = useAppStore();
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('m1');
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<MeetingTab>('raw');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generateStatus, setGenerateStatus] = useState('AI 분석 중...');
   const [showNewForm, setShowNewForm] = useState(false);
   const [editingProposal, setEditingProposal] = useState(false);
   const [editedContent, setEditedContent] = useState('');
@@ -22,6 +21,9 @@ export default function Meetings() {
   const [rejectReason, setRejectReason] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
   const filteredMeetings = meetings.filter(m =>
@@ -38,24 +40,15 @@ export default function Meetings() {
     else setActiveTab('raw');
   }, [selectedMeetingId]);
 
-  const handleGenerateProposal = () => {
+  const handleGenerateProposal = async () => {
     if (!selectedMeeting) return;
     setIsGenerating(true);
-    setGenerateStatus('외부 웹(Agent-Reach) 검색 중...');
-    
-    setTimeout(() => {
-      setGenerateStatus('Deep Research 심층 분석 중...');
-    }, 1500);
-
-    setTimeout(() => {
-      setGenerateStatus('기획서 초안 작성 중...');
-    }, 3000);
-
-    setTimeout(() => {
-      generateProposal(selectedMeeting.id);
-      setIsGenerating(false);
+    try {
+      await generateProposal(selectedMeeting.id);
       setActiveTab('analysis');
-    }, 4500);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleReject = () => {
@@ -81,8 +74,30 @@ export default function Meetings() {
     e.preventDefault();
     if (!newTitle || !newContent) return;
     await addMeeting({ title: newTitle, content: newContent });
-    setNewTitle(''); setNewContent('');
+    setNewTitle(''); setNewContent(''); setUploadedFileName(''); setExtractError('');
     setShowNewForm(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsExtracting(true);
+    setExtractError('');
+    setUploadedFileName(file.name);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/meetings/extract-text', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '파일 처리에 실패했습니다.');
+      setNewContent(prev => (prev ? prev + '\n\n' : '') + data.text);
+      if (!newTitle) setNewTitle(file.name.replace(/\.[^.]+$/, ''));
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : '파일 처리에 실패했습니다.');
+    } finally {
+      setIsExtracting(false);
+      e.target.value = '';
+    }
   };
 
   const handleDelete = (meetingId: string) => {
@@ -142,8 +157,27 @@ export default function Meetings() {
                   <input autoFocus required value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="예: [주간회의] 8월 2주차 스프린트 플래닝" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">회의 내용 <span className="text-gray-400 font-normal">(각 줄이 하나의 안건으로 처리됩니다)</span></label>
-                  <textarea required value={newContent} onChange={e => setNewContent(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm h-44 resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="회의 내용을 한 줄씩 입력하세요.&#10;&#10;예:&#10;신규 로그인 화면 디자인 시안 A안 확정&#10;DB 인덱스 최적화 작업 금요일까지 완료 필요&#10;모바일 앱 QA 일정 조율" />
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">파일에서 불러오기 <span className="text-gray-400 font-normal">(음성 mp3/wav/m4a, 문서 txt/md/docx/pdf)</span></label>
+                  <label className={cn(
+                    "flex items-center gap-2 w-full border-2 border-dashed rounded-lg p-3 text-sm cursor-pointer transition-all",
+                    isExtracting ? "border-blue-300 bg-blue-50 cursor-wait" : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/40"
+                  )}>
+                    <input type="file" className="hidden" disabled={isExtracting}
+                      accept=".mp3,.wav,.m4a,.webm,.ogg,.mp4,.txt,.md,.docx,.pdf"
+                      onChange={handleFileUpload} />
+                    {isExtracting ? (
+                      <><Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" /> <span className="text-blue-700 font-medium">{uploadedFileName} 처리 중...</span></>
+                    ) : uploadedFileName ? (
+                      <><Paperclip className="w-4 h-4 text-emerald-600 shrink-0" /> <span className="text-emerald-700 font-medium truncate">{uploadedFileName}</span> <span className="text-gray-400 ml-auto shrink-0">다른 파일 선택</span></>
+                    ) : (
+                      <><Upload className="w-4 h-4 text-gray-400 shrink-0" /> <span className="text-gray-500">클릭해서 파일 선택 (음성은 실제 Whisper로 텍스트 변환됩니다)</span></>
+                    )}
+                  </label>
+                  {extractError && <p className="text-[11px] text-red-600 mt-1.5">{extractError}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">회의 내용 * <span className="text-gray-400 font-normal">(각 줄이 하나의 안건으로 처리됩니다 - 직접 입력하거나 위에서 파일을 불러올 수 있습니다)</span></label>
+                  <textarea required value={newContent} onChange={e => setNewContent(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm h-36 resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="회의 내용을 한 줄씩 입력하세요.&#10;&#10;예:&#10;신규 로그인 화면 디자인 시안 A안 확정&#10;DB 인덱스 최적화 작업 금요일까지 완료 필요&#10;모바일 앱 QA 일정 조율" />
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
@@ -219,7 +253,7 @@ export default function Meetings() {
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] font-black px-2 py-1 rounded-full bg-blue-100 text-blue-700">STT 회의록</span>
+                    <span className="text-[9px] font-black px-2 py-1 rounded-full bg-blue-100 text-blue-700">회의록 원문</span>
                     <span className="text-xs text-gray-400">{selectedMeeting.date}</span>
                     {selectedMeeting.isProposalRejected && <span className="text-[9px] font-black px-2 py-1 rounded-full bg-red-100 text-red-700">반려됨 — 재작성 필요</span>}
                   </div>
@@ -257,7 +291,7 @@ export default function Meetings() {
               {activeTab === 'raw' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                   <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 flex items-center gap-2 text-sm font-bold text-gray-600">
-                    <Mic className="w-4 h-4 text-gray-400" /> 회의 원문 (STT 스크립트)
+                    <Mic className="w-4 h-4 text-gray-400" /> 회의 원문
                   </div>
                   <div className="p-5 space-y-1">
                     {selectedMeeting.summary.map((line, i) => (
@@ -277,7 +311,7 @@ export default function Meetings() {
                       <button onClick={handleGenerateProposal} disabled={isGenerating}
                         className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-sm font-black shadow transition-all disabled:opacity-70 flex items-center gap-2 shrink-0 ml-4"
                       >
-                        {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> {generateStatus}</> : <><BrainCircuit className="w-4 h-4" /> 기획서 작성 API 요청</>}
+                        {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI 분석 및 기획서 작성 중...</> : <><BrainCircuit className="w-4 h-4" /> 기획서 작성 API 요청</>}
                       </button>
                     </div>
                   )}

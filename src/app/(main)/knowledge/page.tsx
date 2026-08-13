@@ -11,7 +11,7 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  sources?: { sourceType: string; sourceId: string; title: string; score: number }[];
+  sources?: { sourceType: string; sourceId: string; title: string; category: string | null; score: number }[];
 }
 
 interface GraphData {
@@ -19,8 +19,8 @@ interface GraphData {
   links: { source: string; target: string }[];
 }
 
-const GROUP_COLORS = ['#9CA3AF', '#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EC4899'];
-const GROUP_LABELS: Record<number, string> = { 1: '프로젝트', 2: '회의록', 3: '기획서', 4: '업무', 5: '담당자' };
+const GROUP_COLORS = ['#9CA3AF', '#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
+const GROUP_LABELS: Record<number, string> = { 1: '프로젝트', 2: '회의록', 3: '기획서', 4: '업무', 5: '담당자', 6: '주제 분류 (AI 자동 태깅)' };
 
 export default function KnowledgeBase() {
   const { currentUser } = useAppStore();
@@ -144,6 +144,7 @@ export default function KnowledgeBase() {
                       <div key={j} className="flex items-center gap-1.5 text-[10px] text-gray-500">
                         {s.sourceType === 'MEETING' ? <FileText className="w-3 h-3" /> : <FileSignature className="w-3 h-3" />}
                         <span className="truncate">{s.title}</span>
+                        {s.category && <span className="shrink-0 bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">{s.category}</span>}
                         <span className="ml-auto shrink-0 font-bold">{Math.round(s.score * 100)}%</span>
                       </div>
                     ))}

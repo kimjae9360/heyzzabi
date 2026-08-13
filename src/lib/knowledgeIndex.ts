@@ -1,15 +1,18 @@
 import { prisma } from './prisma';
-import { embedText, cosineSimilarity } from './openai';
+import { embedText, cosineSimilarity, classifyDocument } from './openai';
 
 export async function indexMeeting(meetingId: string) {
   const meeting = await prisma.meeting.findUnique({ where: { meeting_id: meetingId } });
   if (!meeting) return;
   const text = `${meeting.title}\n\n${meeting.content}${meeting.summary ? `\n\n요약: ${meeting.summary}` : ''}`;
-  const embedding = await embedText(text);
+  const [embedding, category] = await Promise.all([
+    embedText(text),
+    classifyDocument(meeting.title, text).catch(() => null),
+  ]);
   await prisma.knowledgeChunk.upsert({
     where: { source_type_source_id: { source_type: 'MEETING', source_id: meetingId } },
-    update: { title: meeting.title, content: text, embedding: JSON.stringify(embedding) },
-    create: { source_type: 'MEETING', source_id: meetingId, title: meeting.title, content: text, embedding: JSON.stringify(embedding) },
+    update: { title: meeting.title, content: text, embedding: JSON.stringify(embedding), category },
+    create: { source_type: 'MEETING', source_id: meetingId, title: meeting.title, content: text, embedding: JSON.stringify(embedding), category },
   });
 }
 
@@ -17,11 +20,14 @@ export async function indexPlanning(planningId: string) {
   const planning = await prisma.planning.findUnique({ where: { planning_id: planningId } });
   if (!planning) return;
   const text = `${planning.title}\n\n${planning.content}`;
-  const embedding = await embedText(text);
+  const [embedding, category] = await Promise.all([
+    embedText(text),
+    classifyDocument(planning.title, text).catch(() => null),
+  ]);
   await prisma.knowledgeChunk.upsert({
     where: { source_type_source_id: { source_type: 'PLANNING', source_id: planningId } },
-    update: { title: planning.title, content: text, embedding: JSON.stringify(embedding) },
-    create: { source_type: 'PLANNING', source_id: planningId, title: planning.title, content: text, embedding: JSON.stringify(embedding) },
+    update: { title: planning.title, content: text, embedding: JSON.stringify(embedding), category },
+    create: { source_type: 'PLANNING', source_id: planningId, title: planning.title, content: text, embedding: JSON.stringify(embedding), category },
   });
 }
 
@@ -47,6 +53,7 @@ export interface SearchHit {
   sourceId: string;
   title: string;
   content: string;
+  category: string | null;
   score: number;
 }
 
@@ -58,6 +65,7 @@ export async function searchKnowledge(query: string, topK = 5): Promise<SearchHi
     sourceId: c.source_id,
     title: c.title,
     content: c.content,
+    category: c.category,
     score: cosineSimilarity(queryEmbedding, JSON.parse(c.embedding)),
   }));
   scored.sort((a, b) => b.score - a.score);

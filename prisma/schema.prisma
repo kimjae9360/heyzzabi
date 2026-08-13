@@ -45,6 +45,7 @@ model User {
   approved_plans       Planning[]           @relation("PlanApprover")
   created_projects     Project[]            @relation("ProjectAuthor")
   connected_integrations IntegrationConnection[]
+  research_reports     ResearchReport[]
 }
 
 model Project {
@@ -66,6 +67,7 @@ model Project {
   tasks     Task[]
   meetings  Meeting[]
   plannings Planning[]
+  research_reports ResearchReport[]
 }
 
 model Meeting {
@@ -191,6 +193,7 @@ model KnowledgeChunk {
   title       String
   content     String
   embedding   String // JSON-encoded float array (text-embedding-3-small, 1536dim)
+  category    String? // llm_wiki_graphify 스타일 대분류 자동 태깅 (예: "인증/보안", "AI 파이프라인")
   updated_at  DateTime @updatedAt
   created_at  DateTime @default(now())
 
@@ -206,4 +209,19 @@ model IntegrationConnection {
   connected_by    String
   connected_user  User     @relation(fields: [connected_by], references: [user_id])
   connected_at    DateTime @default(now())
+}
+
+// AI 딥리서치 - 9_deep_research 스킬의 "Local Packet(내부 데이터 취합) -> 다단계 질의 -> 보고서" 패턴을
+// NotebookLM 없이 우리 DB(회의록/기획서/업무)와 OpenAI로 재현한다.
+model ResearchReport {
+  report_id     String    @id @default(uuid())
+  question      String
+  content       String // 마크다운 보고서 본문
+  sources_json  String // 참고한 회의록/기획서/업무 id 목록 (JSON)
+  degraded      Boolean   @default(false) // 내부 데이터가 부족해 제한된 근거로 작성된 경우 true
+  project_id    String?
+  project       Project?  @relation(fields: [project_id], references: [project_id])
+  created_by    String
+  created_user  User      @relation(fields: [created_by], references: [user_id])
+  created_at    DateTime  @default(now())
 }

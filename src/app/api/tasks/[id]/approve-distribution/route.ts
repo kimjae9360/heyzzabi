@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { toTaskDTO } from '@/lib/serializers';
 import { getActingUser } from '@/lib/currentUser';
 import { assertValidTransition } from '@/lib/taskWorkflow';
+import { recommendAssignee, scoreCandidate } from '@/lib/taskAssignment';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,11 +13,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!task) return NextResponse.json({ error: '업무를 찾을 수 없습니다.' }, { status: 404 });
     assertValidTransition(task.status, 'IN_PROGRESS');
 
+    const activeUsers = await prisma.user.findMany({ where: { status: 'ACTIVE' } });
+    const candidates = activeUsers.map((u) => ({
+      id: u.user_id, name: u.name, role: u.job_title || '', level: (u.role === 'ADMIN' ? 'pm' : u.role === 'PM' ? 'lead' : 'member') as 'member' | 'lead' | 'pm',
+      skills: u.stack ? JSON.parse(u.stack) : [], pastProjects: u.past_projects ? JSON.parse(u.past_projects) : [], currentWorkload: u.current_workload,
+    }));
+    const taskInput = { title: task.title, description: task.description || undefined, difficulty: task.difficulty || undefined };
+
     let assigneeId: string | undefined = body.assigneeId;
+    let assignmentReason: string | null = null;
     if (!assigneeId) {
-      const leastBusy = await prisma.user.findFirst({ where: { status: 'ACTIVE' }, orderBy: { current_workload: 'asc' } });
-      if (!leastBusy) return NextResponse.json({ error: '배정 가능한 직원이 없습니다.' }, { status: 422 });
-      assigneeId = leastBusy.user_id;
+      const recommendation = recommendAssignee(taskInput, candidates);
+      if (!recommendation) return NextResponse.json({ error: '배정 가능한 직원이 없습니다.' }, { status: 422 });
+      assigneeId = recommendation.employeeId;
+      assignmentReason = `AI 추천 (점수 ${Math.round(recommendation.score)}): ${recommendation.reason}`;
+    } else {
+      const candidate = candidates.find((c) => c.id === assigneeId);
+      if (candidate) {
+        const scored = scoreCandidate(taskInput, candidate);
+        assignmentReason = `수동 지정 (참고 점수 ${Math.round(scored.score)}): ${scored.reason}`;
+      }
     }
     const assignee = await prisma.user.findUnique({ where: { user_id: assigneeId } });
     if (!assignee) return NextResponse.json({ error: '담당자를 찾을 수 없습니다.' }, { status: 404 });

@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// 실제 DB 관계(Project-Meeting-Planning-Task-User)로부터 지식그래프를 구성한다.
+// 실제 DB 관계(Project-Meeting-Planning-Task-User)에 더해, llm_wiki_graphify 스타일로
+// 자동 분류된 대분류(category) 태그를 별도 노드 레이어로 얹어 주제별 클러스터링을 보여준다.
 export async function GET() {
-  const [projects, meetings, plannings, tasks, users] = await Promise.all([
+  const [projects, meetings, plannings, tasks, users, chunks] = await Promise.all([
     prisma.project.findMany(),
     prisma.meeting.findMany(),
     prisma.planning.findMany(),
     prisma.task.findMany({ where: { assignee_id: { not: null } } }),
     prisma.user.findMany(),
+    prisma.knowledgeChunk.findMany({ where: { category: { not: null } } }),
   ]);
 
   const nodes: { id: string; label: string; group: number }[] = [];
@@ -36,6 +38,18 @@ export async function GET() {
   for (const u of users) {
     if (usedUsers.has(u.user_id)) nodes.push({ id: `user:${u.user_id}`, label: u.name, group: 5 });
   }
+
+  // 카테고리(대분류) 레이어 - 같은 주제로 자동 분류된 회의록/기획서를 카테고리 노드로 묶는다
+  const categories = new Set<string>();
+  for (const c of chunks) {
+    if (!c.category) continue;
+    categories.add(c.category);
+    const targetId = c.source_type === 'MEETING' ? `meeting:${c.source_id}` : `planning:${c.source_id}`;
+    if (nodes.some((n) => n.id === targetId)) {
+      links.push({ source: `category:${c.category}`, target: targetId });
+    }
+  }
+  for (const cat of categories) nodes.push({ id: `category:${cat}`, label: cat, group: 6 });
 
   return NextResponse.json({ nodes, links });
 }

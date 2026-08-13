@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const hits = await searchKnowledge(body.query, 5);
     const relevant = hits.filter((h) => h.score > 0.15);
     const result = await answerFromContext(body.query, relevant);
-    return NextResponse.json({ answer: result.answer, sources: relevant.map((h) => ({ sourceType: h.sourceType, sourceId: h.sourceId, title: h.title, score: h.score })) });
+    return NextResponse.json({ answer: result.answer, sources: relevant.map((h) => ({ sourceType: h.sourceType, sourceId: h.sourceId, title: h.title, category: h.category, score: h.score })) });
   } catch (err) {
     if (err instanceof AIConfigError) return NextResponse.json({ error: err.message }, { status: 400 });
     return NextResponse.json({ error: err instanceof Error ? err.message : '질의에 실패했습니다.' }, { status: 500 });

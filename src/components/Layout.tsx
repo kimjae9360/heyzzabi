@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut } from 'lucide-react';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
 
@@ -15,6 +15,7 @@ const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?
   { name: '결재함', path: '/approvals', icon: CheckSquare, minLevel: 'lead' },
   { name: '직원관리', path: '/employees', icon: Users, minLevel: 'pm' },
   { name: '지식망', path: '/knowledge', icon: Network },
+  { name: 'AI 리서치', path: '/research', icon: Microscope },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },
 ];

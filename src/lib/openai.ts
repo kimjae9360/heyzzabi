@@ -31,6 +31,20 @@ async function callJson<T>(system: string, user: string): Promise<T> {
   return JSON.parse(content) as T;
 }
 
+async function callText(system: string, user: string): Promise<string> {
+  const openai = getClient();
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  });
+  const content = completion.choices[0]?.message?.content;
+  if (!content) throw new Error('AI 응답이 비어 있습니다.');
+  return content;
+}
+
 export interface MeetingAnalysis {
   summary: string;
   agenda: string[];
@@ -71,6 +85,15 @@ export async function breakdownProposalIntoTasks(proposalTitle: string, proposal
   return result.tasks;
 }
 
+// llm_wiki_graphify 스타일 대분류 자동 소팅: 정해진 enum이 아니라 문서 내용에서 자연스러운 카테고리를 뽑는다
+export async function classifyDocument(title: string, content: string): Promise<string> {
+  const result = await callJson<{ category: string }>(
+    '당신은 사내 지식 분류 담당자입니다. 주어진 문서를 짧은 한국어 대분류 태그(예: "인증/보안", "AI 파이프라인", "UI/UX", "온보딩", "인프라") 하나로 분류하세요. 이미 존재할 법한 일반적인 카테고리명을 쓰고, 너무 구체적이거나 문서 제목 그대로 베끼지 마세요. JSON으로 반환: {"category": string}',
+    `제목: ${title}\n\n내용:\n${content.slice(0, 2000)}`
+  );
+  return result.category;
+}
+
 export async function embedText(text: string): Promise<number[]> {
   const openai = getClient();
   const result = await openai.embeddings.create({
@@ -106,4 +129,59 @@ export async function answerFromContext(question: string, contextChunks: { title
     `컨텍스트:\n${context}\n\n질문: ${question}`
   );
   return result;
+}
+
+export interface LocalPacketDoc {
+  kind: string; // 회의록 / 기획서 / 업무
+  title: string;
+  content: string;
+}
+
+export interface DeepResearchResult {
+  content: string; // markdown 보고서
+  degraded: boolean; // 내부 데이터가 부족해 제한된 근거로 작성됐는지
+}
+
+// 9_deep_research 스킬의 패턴을 재현: Local Packet(내부 데이터 취합) -> Q1(사실관계) -> Q2(심화분석) -> 보고서.
+// 외부 웹 검색은 하지 않는다 - 오직 우리 DB에 있는 내부 데이터만 근거로 쓰고, 부족하면 부족하다고 정직하게 밝힌다.
+export async function runDeepResearch(question: string, packet: LocalPacketDoc[]): Promise<DeepResearchResult> {
+  const degraded = packet.length < 2;
+  const packetText = packet.length > 0
+    ? packet.map((d, i) => `[${i + 1}] (${d.kind}) ${d.title}\n${d.content}`).join('\n\n---\n\n')
+    : '(내부 데이터 없음)';
+
+  const facts = await callJson<{ confirmedFacts: string[]; unknowns: string[] }>(
+    '당신은 내부 데이터 팩트체커입니다. 주어진 회의록/기획서/업무 기록(Local Packet)만 근거로, 질문과 관련해 "확인된 사실"과 "내부 자료로는 확인되지 않는 사항"을 구분해 JSON으로 반환하세요. 절대 추측하거나 외부 지식으로 채우지 마세요. 형식: {"confirmedFacts": string[], "unknowns": string[]}',
+    `질문: ${question}\n\nLocal Packet:\n${packetText}`
+  );
+
+  const report = await callText(
+    `당신은 내부 데이터 기반 리서치 분석가입니다. 1단계에서 확인된 사실과 미확인 사항을 바탕으로 마크다운 심층 분석 보고서를 작성하세요.
+반드시 아래 구조를 따르세요:
+## 1. 배경 및 질문
+## 2. 확인된 사실 (내부 자료 근거)
+## 3. 반복되는 패턴 / 리스크
+## 4. 미확인 사항 (내부 자료로는 알 수 없음, 추가 조사 필요)
+## 5. 권장 조치 (사람 승인 필요)
+마지막 섹션 제목 아래에는 반드시 "이 권장 조치는 자동 실행되지 않으며, 담당자의 명시적 승인이 있어야 실행됩니다." 라는 문구를 포함하세요.
+외부 지식이나 웹 검색 결과를 지어내지 마세요 - 오직 확인된 사실/미확인 사항만 근거로 쓰세요.`,
+    `질문: ${question}\n\n확인된 사실:\n${facts.confirmedFacts.map(f => `- ${f}`).join('\n') || '(없음)'}\n\n미확인 사항:\n${facts.unknowns.map(f => `- ${f}`).join('\n') || '(없음)'}`
+  );
+
+  const header = degraded
+    ? `> ⚠️ **내부 데이터 부족 경고**: 관련된 회의록/기획서/업무가 ${packet.length}건밖에 없어 제한된 근거로 작성된 보고서입니다. 참고용으로만 활용하세요.\n\n`
+    : '';
+
+  return { content: header + report, degraded };
+}
+
+// 실제 Whisper 음성 인식 - 음성 파일을 업로드하면 진짜로 텍스트로 변환한다 (연출 아님)
+export async function transcribeAudio(file: File): Promise<string> {
+  const openai = getClient();
+  const result = await openai.audio.transcriptions.create({
+    file,
+    model: 'whisper-1',
+    language: 'ko',
+  });
+  return result.text;
 }
