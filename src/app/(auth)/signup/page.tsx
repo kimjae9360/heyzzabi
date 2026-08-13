@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, AlertCircle } from 'lucide-react';
+import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN } from '@/lib/employeeOptions';
 
 export default function SignupPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', password: '', department: '', position: '', jobTitle: '' });
+  const [form, setForm] = useState({ name: '', emailLocal: '', password: '', department: '', position: '', jobTitle: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,10 +17,11 @@ export default function SignupPage() {
     setIsLoading(true);
     setError('');
     try {
+      const { emailLocal, ...rest } = form;
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...rest, email: `${emailLocal}@${EMAIL_DOMAIN}` }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -54,8 +56,11 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-600 mb-1">회사 이메일 *</label>
-          <input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="hong@heyzzabi.com" />
+          <div className="flex items-stretch border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 bg-gray-50 focus-within:bg-white">
+            <input type="text" required value={form.emailLocal} onChange={e => setForm(f => ({ ...f, emailLocal: e.target.value.replace(/[^a-zA-Z0-9._-]/g, '') }))}
+              className="flex-1 min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
+            <span className="flex items-center px-2.5 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@{EMAIL_DOMAIN}</span>
+          </div>
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-600 mb-1">비밀번호 * <span className="font-normal text-gray-400">(8자 이상)</span></label>
@@ -65,19 +70,28 @@ export default function SignupPage() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-[10px] font-bold text-gray-600 mb-1">부서 *</label>
-            <input required value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="개발팀" />
+            <select required value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+              <option value="" disabled>선택</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-600 mb-1">직급 *</label>
-            <input required value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="사원" />
+            <select required value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+              <option value="" disabled>선택</option>
+              {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
           </div>
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-600 mb-1">직무</label>
-          <input value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="Frontend" />
+          <select value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))}
+            className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+            <option value="">선택 안 함</option>
+            {JOB_TITLES.map(j => <option key={j} value={j}>{j}</option>)}
+          </select>
         </div>
         <button type="submit" disabled={isLoading}
           className="w-full bg-gray-900 hover:bg-black text-white font-bold text-sm py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-60 mt-2"

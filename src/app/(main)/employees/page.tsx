@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { UserPlus, Users, Search, Trash2, Pencil, X, Save, Mail, Phone, BadgeCheck, ShieldAlert, CircleSlash, Moon } from 'lucide-react';
 import { useAppStore, type Employee, type EmployeeStatus } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
+import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN, splitEmail } from '@/lib/employeeOptions';
 
 type FilterStatus = 'all' | EmployeeStatus;
 
@@ -16,7 +17,7 @@ const STATUS_META: Record<EmployeeStatus, { label: string; color: string; icon: 
 
 interface FormState {
   name: string;
-  email: string;
+  emailLocal: string;
   phone: string;
   department: string;
   position: string;
@@ -30,7 +31,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  name: '', email: '', phone: '', department: '', position: '', role: '',
+  name: '', emailLocal: '', phone: '', department: '', position: '', role: '',
   level: 'member', status: 'ACTIVE', hireDate: '', skillsStr: '', certsStr: '', projectsStr: '',
 };
 
@@ -79,7 +80,7 @@ export default function Employees() {
     setEditingId(emp.id);
     setForm({
       name: emp.name,
-      email: emp.email,
+      emailLocal: splitEmail(emp.email).local,
       phone: emp.phone || '',
       department: emp.department,
       position: emp.position,
@@ -96,11 +97,11 @@ export default function Employees() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.department || !form.position || !form.role) return;
+    if (!form.name || !form.emailLocal || !form.department || !form.position || !form.role) return;
 
     const payload = {
       name: form.name,
-      email: form.email,
+      email: `${form.emailLocal}@${EMAIL_DOMAIN}`,
       phone: form.phone || undefined,
       department: form.department,
       position: form.position,
@@ -154,8 +155,11 @@ export default function Employees() {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">회사 이메일 *</label>
-                  <input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="hong@heyzzabi.com" />
+                  <div className="flex items-stretch border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 bg-gray-50 focus-within:bg-white">
+                    <input required type="text" value={form.emailLocal} onChange={e => setForm(f => ({ ...f, emailLocal: e.target.value.replace(/[^a-zA-Z0-9._-]/g, '') }))}
+                      className="flex-1 min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
+                    <span className="flex items-center px-2.5 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@{EMAIL_DOMAIN}</span>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -173,18 +177,27 @@ export default function Employees() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">부서 *</label>
-                  <input required value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="개발팀" />
+                  <select required value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+                    <option value="" disabled>선택</option>
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">직급 *</label>
-                  <input required value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="사원/대리/과장" />
+                  <select required value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+                    <option value="" disabled>선택</option>
+                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">직무 *</label>
-                  <input required value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="Frontend" />
+                  <select required value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white">
+                    <option value="" disabled>선택</option>
+                    {JOB_TITLES.map(j => <option key={j} value={j}>{j}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
