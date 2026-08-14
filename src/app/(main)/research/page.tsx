@@ -118,6 +118,19 @@ export default function ResearchPage() {
     }
   };
 
+  const handleDeleteReport = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('이 리서치 보고서를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+    try {
+      const res = await fetch(`/api/research/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('삭제에 실패했습니다.');
+      if (selectedId === id) setSelectedId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '삭제에 실패했습니다.');
+    }
+  };
+
   const selected = reports.find(r => r.id === selectedId);
 
   return (
@@ -175,18 +188,28 @@ export default function ResearchPage() {
                 아직 생성된 리서치 보고서가 없습니다.
               </div>
             ) : reports.map(r => (
-              <button
+              <div
                 key={r.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedId(r.id)}
-                className={cn("w-full text-left p-4 hover:bg-gray-50 transition-colors", selectedId === r.id && "bg-blue-50")}
+                onKeyDown={e => { if (e.key === 'Enter') setSelectedId(r.id); }}
+                className={cn("relative w-full text-left p-4 pr-9 hover:bg-gray-50 transition-colors cursor-pointer group", selectedId === r.id && "bg-blue-50")}
               >
+                <button
+                  onClick={e => handleDeleteReport(r.id, e)}
+                  title="보고서 삭제"
+                  className="absolute top-3 right-3 p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
                 <div className="flex items-center gap-1.5 mb-1">
                   {r.degraded && <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">근거 부족</span>}
                   <span className="text-[9px] text-gray-400">{r.sourceCount}건 참고</span>
                 </div>
                 <p title={r.question} className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{r.question}</p>
                 <p className="text-[10px] text-gray-400">{r.createdBy} · {new Date(r.createdAt).toLocaleString('ko-KR')}</p>
-              </button>
+              </div>
             ))}
           </div>
         </div>
