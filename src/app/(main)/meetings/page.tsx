@@ -95,7 +95,10 @@ export default function Meetings() {
   const handleAddMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newContent) return;
-    await addMeeting({ title: newTitle, content: newContent, projectId: newProjectId || undefined });
+    const newMeeting = await addMeeting({ title: newTitle, content: newContent, projectId: newProjectId || undefined });
+    if (newMeeting) {
+      setSelectedMeetingId(newMeeting.id);
+    }
     setNewTitle(''); setNewContent(''); setUploadedFileName(''); setExtractError('');
     setShowNewForm(false);
   };

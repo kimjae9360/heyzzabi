@@ -141,7 +141,7 @@ interface AppState {
   createProject: (data: { title: string; description?: string; priority?: string; targetDueDate?: string }) => Promise<Project | null>;
 
   // Meetings
-  addMeeting: (data: { title: string; content: string; projectId?: string }) => Promise<void>;
+  addMeeting: (data: { title: string; content: string; projectId?: string }) => Promise<Meeting | null>;
   deleteMeeting: (meetingId: string) => Promise<void>;
 
   // Pipeline phase 1: Meeting -> Proposal (real AI call)
@@ -290,11 +290,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addMeeting: async ({ title, content, projectId }) => {
     try {
-      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content, projectId }) });
+      const createdDto = await apiFetch<MeetingApiDTO>('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content, projectId }) });
       await get().fetchData();
       set({ toast: { message: '회의록이 등록되었습니다.', type: 'success' } });
+      return mapMeeting(createdDto);
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '회의록 등록에 실패했습니다.', type: 'error' } });
+      return null;
     }
   },
 
