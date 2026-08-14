@@ -9,6 +9,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const planning = await prisma.planning.findUnique({ where: { planning_id: id } });
     if (!planning) return NextResponse.json({ error: '기획서를 찾을 수 없습니다.' }, { status: 404 });
+    if (planning.status === 'REJECTED') {
+      return NextResponse.json({ error: '반려된 기획서는 수정 후 다시 생성해 주세요.' }, { status: 409 });
+    }
+    if (planning.status === 'APPROVED') {
+      const existingTasks = await prisma.task.findMany({
+        where: { planning_id: id },
+        include: { planning: true, meeting: true },
+        orderBy: { created_at: 'asc' },
+      });
+      return NextResponse.json(existingTasks.map(toTaskDTO));
+    }
 
     const user = await getActingUser(request);
     const drafts = await breakdownProposalIntoTasks(planning.title, planning.content);
@@ -17,10 +28,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const tasks = await prisma.$transaction(async (tx) => {
-      await tx.planning.update({
-        where: { planning_id: id },
+      const approved = await tx.planning.updateMany({
+        where: { planning_id: id, status: 'DRAFT' },
         data: { status: 'APPROVED', approved_by: user.user_id, approved_at: new Date() },
       });
+
+      // 같은 요청이 동시에 들어온 경우, 먼저 승인한 요청이 만든 업무를 반환한다.
+      if (approved.count === 0) {
+        return tx.task.findMany({
+          where: { planning_id: id },
+          include: { planning: true, meeting: true },
+          orderBy: { created_at: 'asc' },
+        });
+      }
 
       if (planning.meeting_id) {
         await tx.meeting.update({ where: { meeting_id: planning.meeting_id }, data: { status: 'CONFIRMED' } });

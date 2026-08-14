@@ -9,7 +9,7 @@ import { useAppStore } from '@/store/useAppStore';
 type MeetingTab = 'raw' | 'analysis' | 'proposal';
 
 export default function Meetings() {
-  const { meetings = [], projects = [], fetchProjects, createProject, generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
+  const { meetings = [], projects = [], fetchProjects, createProject, generateProposal = async () => false, editProposal = async () => false, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<MeetingTab>('raw');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -66,8 +66,9 @@ export default function Meetings() {
     if (!selectedMeeting) return;
     setIsGenerating(true);
     try {
-      await generateProposal(selectedMeeting.id);
-      setActiveTab('analysis');
+      if (await generateProposal(selectedMeeting.id)) {
+        setActiveTab('analysis');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -86,10 +87,11 @@ export default function Meetings() {
     approveProposalAndExtractTasks(selectedMeeting.id);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedMeeting) return;
-    editProposal(selectedMeeting.id, editedContent);
-    setEditingProposal(false);
+    if (await editProposal(selectedMeeting.id, editedContent)) {
+      setEditingProposal(false);
+    }
   };
 
   const handleAddMeeting = async (e: React.FormEvent) => {

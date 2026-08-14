@@ -145,8 +145,8 @@ interface AppState {
   deleteMeeting: (meetingId: string) => Promise<void>;
 
   // Pipeline phase 1: Meeting -> Proposal (real AI call)
-  generateProposal: (meetingId: string) => Promise<void>;
-  editProposal: (meetingId: string, content: string) => Promise<void>;
+  generateProposal: (meetingId: string) => Promise<boolean>;
+  editProposal: (meetingId: string, content: string) => Promise<boolean>;
   approveProposalAndExtractTasks: (meetingId: string) => Promise<void>;
   rejectProposal: (meetingId: string, reason: string) => Promise<void>;
   downloadPPT: (meetingId: string) => Promise<void>;
@@ -315,20 +315,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       await apiFetch(`/api/meetings/${meetingId}/review-complete`, { method: 'POST' });
       await get().fetchData();
       set({ toast: { message: 'AI 기획서 초안이 생성되었습니다. 내용을 검토해 주세요.', type: 'success' } });
+      return true;
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '기획서 생성에 실패했습니다.', type: 'error' } });
+      return false;
     }
   },
 
   editProposal: async (meetingId, content) => {
-    const meeting = get().meetings.find(m => m.id === meetingId);
-    if (!meeting) return;
     try {
-      await apiFetch(`/api/meetings/${meetingId}`, { method: 'PATCH', body: JSON.stringify({}) });
-      set(state => ({ meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m) }));
-    } catch {
-      // editProposal은 로컬 편집 상태만 반영 (저장은 별도 planning PATCH 라우트 필요 시 확장)
-      set(state => ({ meetings: state.meetings.map(m => m.id === meetingId ? { ...m, proposalContent: content } : m) }));
+      const fresh = await apiFetch<MeetingApiDTO[]>('/api/meetings');
+      const target = fresh.find(m => m.id === meetingId);
+      if (!target?.proposalId) throw new Error('수정할 기획서를 찾을 수 없습니다.');
+
+      await apiFetch(`/api/plannings/${target.proposalId}`, { method: 'PATCH', body: JSON.stringify({ content }) });
+      await get().fetchData();
+      set({ toast: { message: '기획서 수정 내용이 저장되었습니다.', type: 'success' } });
+      return true;
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '기획서 저장에 실패했습니다.', type: 'error' } });
+      return false;
     }
   },
 
@@ -432,11 +438,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateTaskProgress: async (taskId, progress) => {
-    set(state => ({ tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: Math.max(0, Math.min(100, progress)) } : t) }));
+    const previousProgress = get().tasks.find(t => t.id === taskId)?.progress;
+    const nextProgress = Math.max(0, Math.min(100, progress));
+    set(state => ({ tasks: state.tasks.map(t => t.id === taskId ? { ...t, progress: nextProgress } : t) }));
     try {
-      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ progress }) });
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ progress: nextProgress }) });
     } catch (err) {
-      set({ toast: { message: err instanceof Error ? err.message : '진행률 저장에 실패했습니다.', type: 'error' } });
+      set(state => ({
+        tasks: state.tasks.map(t => t.id === taskId && previousProgress !== undefined ? { ...t, progress: previousProgress } : t),
+        toast: { message: err instanceof Error ? err.message : '진행률 저장에 실패했습니다.', type: 'error' },
+      }));
     }
   },
 
