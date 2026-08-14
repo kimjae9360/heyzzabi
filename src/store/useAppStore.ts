@@ -171,7 +171,7 @@ function mapMeeting(m: MeetingApiDTO): Meeting {
 interface TaskApiDTO {
   id: string; title: string; description?: string; source: string; status: string;
   assigneeId?: string; progress: number; estimatedHours?: number; difficulty?: string;
-  rejectedReason?: string; delayReason?: string; completedAt?: string; completedAtIso?: string; createdAtIso: string;
+  rejectedReason?: string; delayReason?: string; completedAt?: string; completedAtIso?: string; createdAtIso: string; dueDateIso?: string;
 }
 function mapTask(t: TaskApiDTO): Task | null {
   const status = DB_TASK_STATUS_TO_UI[t.status];
@@ -181,6 +181,7 @@ function mapTask(t: TaskApiDTO): Task | null {
     assigneeId: t.assigneeId, progress: t.progress, estimatedHours: t.estimatedHours,
     difficulty: t.difficulty as Task['difficulty'], rejectedReason: t.rejectedReason,
     delayReason: t.delayReason, completedAt: t.completedAt, completedAtIso: t.completedAtIso, createdAtIso: t.createdAtIso,
+    dueDate: t.dueDateIso,
   };
 }
 

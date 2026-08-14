@@ -104,6 +104,7 @@ export function toTaskDTO(task: Task & { planning?: Planning | null; meeting?: M
     completedAt: task.completed_at ? task.completed_at.toLocaleDateString('ko-KR') : undefined,
     completedAtIso: task.completed_at ? task.completed_at.toISOString() : undefined,
     createdAtIso: task.created_at.toISOString(),
+    dueDateIso: task.end_date ? task.end_date.toISOString() : undefined,
     planningId: task.planning_id ?? undefined,
     meetingId: task.meeting_id ?? undefined,
   };

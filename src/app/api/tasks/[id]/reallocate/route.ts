@@ -18,11 +18,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!candidate) return NextResponse.json({ error: '재배정 가능한 직원이 없습니다.' }, { status: 422 });
 
     const actingUser = await getActingUser(request);
+    const now = new Date();
+    const dueDate = new Date(now.getTime() + (task.estimated_hours || 8) * 60 * 60 * 1000);
 
     const updated = await prisma.$transaction(async (tx) => {
       const t = await tx.task.update({
         where: { task_id: id },
-        data: { status: 'IN_PROGRESS', assignee_id: candidate.user_id, delay_reason: null },
+        data: { status: 'IN_PROGRESS', assignee_id: candidate.user_id, delay_reason: null, start_date: now, end_date: dueDate, sla_alerted_at: null },
         include: { planning: true, meeting: true },
       });
       await tx.user.update({ where: { user_id: candidate.user_id }, data: { current_workload: Math.min(100, candidate.current_workload + 10) } });

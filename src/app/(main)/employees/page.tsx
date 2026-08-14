@@ -43,7 +43,6 @@ export default function Employees() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let result = employees;
@@ -124,13 +123,9 @@ export default function Employees() {
     setEditingId(null);
   };
 
-  const handleRemove = (id: string) => {
-    if (confirmDeleteId === id) {
+  const handleRemove = (id: string, name: string) => {
+    if (window.confirm(`${name}님을 직원 목록에서 삭제하시겠습니까?`)) {
       removeEmployee(id);
-      setConfirmDeleteId(null);
-    } else {
-      setConfirmDeleteId(id);
-      setTimeout(() => setConfirmDeleteId(null), 4000);
     }
   };
 
@@ -398,13 +393,11 @@ export default function Employees() {
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleRemove(emp.id)}
-                        className={cn("p-1.5 rounded-lg transition-all text-[10px] font-bold",
-                          confirmDeleteId === emp.id ? "bg-red-100 text-red-700 border border-red-200" : "text-gray-300 hover:text-red-500 hover:bg-red-50"
-                        )}
-                        title={confirmDeleteId === emp.id ? '한 번 더 클릭하면 삭제됩니다' : '삭제'}
+                        onClick={() => handleRemove(emp.id, emp.name)}
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                        title="삭제"
                       >
-                        {confirmDeleteId === emp.id ? '확인?' : <Trash2 className="w-3.5 h-3.5" />}
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>

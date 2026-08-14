@@ -6,14 +6,25 @@ import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, Fil
 import Link from 'next/link';
 import { useAppStore, type TaskUiStatus, type Employee } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
-import { recommendAssignee } from '@/lib/taskAssignment';
+import { recommendAssignee, scoreCandidate, type AssignmentScore } from '@/lib/taskAssignment';
 
 interface RejectModal { type: 'proposal' | 'distribution'; id: string; title: string; }
+interface DelayModal { id: string; title: string; }
+interface DropConfirm { taskId: string; title: string; employee: Employee; scoreInfo: AssignmentScore; }
+
+function toCandidate(e: Employee) {
+  return { id: e.id, name: e.name, role: e.role, level: e.level, skills: e.skills, pastProjects: e.pastProjects, currentWorkload: e.currentWorkload };
+}
 
 function recommend(title: string, employees: Employee[]) {
-  return recommendAssignee({ title }, employees.map((e) => ({
-    id: e.id, name: e.name, role: e.role, level: e.level, skills: e.skills, pastProjects: e.pastProjects, currentWorkload: e.currentWorkload,
-  })));
+  return recommendAssignee({ title }, employees.map(toCandidate));
+}
+
+function formatDueLabel(dueDateIso: string): string {
+  const diffHours = (new Date(dueDateIso).getTime() - Date.now()) / (1000 * 60 * 60);
+  if (diffHours < 0) return `⏰ 목표 완료 시각 ${Math.round(-diffHours)}시간 초과`;
+  if (diffHours < 24) return `목표: ${Math.round(diffHours)}시간 후`;
+  return `목표: ${Math.round(diffHours / 24)}일 후`;
 }
 
 // plane 스타일: 카드는 드래그 가능, 컬럼은 드롭 영역. 허용 안 된 이동은 토스트로 막고 스냅백한다.
@@ -51,6 +62,9 @@ export default function Pipeline() {
   const [rejectModal, setRejectModal] = useState<RejectModal | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [manualAssignees, setManualAssignees] = useState<Record<string, string>>({});
+  const [delayModal, setDelayModal] = useState<DelayModal | null>(null);
+  const [delayReason, setDelayReason] = useState('');
+  const [dropConfirm, setDropConfirm] = useState<DropConfirm | null>(null);
 
   const meetingsRaw = meetings.filter(m => !m.hasProposal);
   const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted);
@@ -102,8 +116,16 @@ export default function Pipeline() {
     setRejectReason('');
   };
 
-  const handleSimulateDelay = (t: { id: string; title: string }) => {
-    reportDelay(t.id, '기술 검토 지연 및 리소스 부족');
+  const handleOpenDelayModal = (t: { id: string; title: string }) => {
+    setDelayModal({ id: t.id, title: t.title });
+    setDelayReason('');
+  };
+
+  const handleConfirmDelay = () => {
+    if (!delayModal || !delayReason.trim()) return;
+    reportDelay(delayModal.id, delayReason.trim());
+    setDelayModal(null);
+    setDelayReason('');
   };
 
   const handleReallocate = (t: { id: string; title: string }) => {
@@ -134,7 +156,14 @@ export default function Pipeline() {
     if (sourceColumn === targetColumn) return;
 
     if (sourceColumn === 'col-distribution' && targetColumn === 'col-progress') {
-      handleApproveDistribution(task);
+      // 드래그로 떨어뜨리는 즉시 배분을 확정하지 않는다 - 반려와 동일하게 확인 모달을 거친다.
+      if (employees.length === 0) return;
+      const recommendation = recommend(task.title, employees);
+      const recommendedEmp = employees.find(e => e.id === recommendation?.employeeId);
+      const selectedEmpId = manualAssignees[task.id] || recommendedEmp?.id;
+      const bestEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp || employees[0];
+      const scoreInfo = scoreCandidate({ title: task.title }, toCandidate(bestEmp));
+      setDropConfirm({ taskId: task.id, title: task.title, employee: bestEmp, scoreInfo });
     } else if (sourceColumn === 'col-progress' && targetColumn === 'col-done') {
       handleCompleteTask(taskId);
     } else {
@@ -144,6 +173,17 @@ export default function Pipeline() {
         'warning'
       );
     }
+  };
+
+  const handleConfirmDrop = () => {
+    if (!dropConfirm) return;
+    approveDistribution(dropConfirm.taskId, dropConfirm.employee.id);
+    setManualAssignees(prev => {
+      const next = { ...prev };
+      delete next[dropConfirm.taskId];
+      return next;
+    });
+    setDropConfirm(null);
   };
 
   const columns = [
@@ -184,6 +224,74 @@ export default function Pipeline() {
                   className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 >
                   <AlertTriangle className="w-4 h-4" /> 반려 처리
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delay Report Modal */}
+      {delayModal && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden border border-amber-100">
+            <div className="bg-amber-50 border-b border-amber-100 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> 지연 보고
+              </h3>
+              <button onClick={() => setDelayModal(null)} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-gray-500 mb-1">대상</p>
+              <p className="text-sm font-bold text-gray-900 mb-4 bg-gray-50 px-3 py-2 rounded-lg border">{delayModal.title}</p>
+              <p className="text-xs font-bold text-gray-500 mb-1.5">지연 사유 <span className="text-red-500">*</span></p>
+              <textarea
+                autoFocus
+                value={delayReason}
+                onChange={e => setDelayReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl p-3 text-sm h-28 resize-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
+                placeholder="예: 외부 API 연동 검증에 예상보다 시간이 걸리고 있습니다."
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <button onClick={() => setDelayModal(null)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                <button onClick={handleConfirmDelay} disabled={!delayReason.trim()}
+                  className="px-4 py-2 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                >
+                  <AlertTriangle className="w-4 h-4" /> 지연 기록
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drag-to-approve confirmation */}
+      {dropConfirm && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[440px] overflow-hidden border border-indigo-100">
+            <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-indigo-900 flex items-center gap-2">
+                <User className="w-5 h-5" /> 배분 승인 확인
+              </h3>
+              <button onClick={() => setDropConfirm(null)} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs font-bold text-gray-500 mb-1">업무</p>
+              <p className="text-sm font-bold text-gray-900 mb-4 bg-gray-50 px-3 py-2 rounded-lg border">{dropConfirm.title}</p>
+              <p className="text-xs font-bold text-gray-500 mb-1.5">담당자로 배정하고 승인합니다</p>
+              <div className="flex items-center gap-2 bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[11px] font-black shrink-0">{dropConfirm.employee.avatar}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-gray-900">{dropConfirm.employee.name} <span className="text-gray-400 font-normal text-xs">({dropConfirm.employee.role})</span></div>
+                  <div className="text-[10px] text-indigo-700/70">근거: {dropConfirm.scoreInfo.reason} · 적합도 {Math.round(dropConfirm.scoreInfo.score)}</div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button onClick={() => setDropConfirm(null)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                <button onClick={handleConfirmDrop}
+                  className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <User className="w-4 h-4" /> 배분 승인
                 </button>
               </div>
             </div>
@@ -339,6 +447,7 @@ export default function Pipeline() {
               const recommendedEmp = employees.find(e => e.id === recommend(t.title, employees)?.employeeId);
               const selectedEmpId = manualAssignees[t.id] || recommendedEmp?.id;
               const selectedEmp = employees.find(e => e.id === selectedEmpId) || recommendedEmp;
+              const selectedScore = selectedEmp ? scoreCandidate({ title: t.title }, toCandidate(selectedEmp)) : null;
 
               return (
                 <DraggableCard key={t.id} id={t.id}>
@@ -385,7 +494,15 @@ export default function Pipeline() {
                             현재 부하: {selectedEmp.currentWorkload}%
                           </div>
                         </div>
+                        {selectedScore && (
+                          <span className="ml-auto shrink-0 text-[9px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                            적합도 {Math.round(selectedScore.score)}
+                          </span>
+                        )}
                       </div>
+                      {selectedScore && (
+                        <p className="mt-1.5 text-[9px] text-blue-700/70 leading-relaxed">근거: {selectedScore.reason}</p>
+                      )}
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -424,17 +541,18 @@ export default function Pipeline() {
             {activeTasks.map((t) => {
               const assignee = employees.find(e => e.id === t.assigneeId);
               const isDelayed = t.status === 'delayed';
+              const isOverdue = !isDelayed && t.dueDate && new Date(t.dueDate).getTime() < Date.now();
               return (
                 <DraggableCard key={t.id} id={t.id}>
                 <div className={cn(
                   "bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-y-gray-100 border-r-gray-100 hover:shadow-md transition-all",
-                  isDelayed ? "border-l-red-500 bg-red-50/30" : "border-l-emerald-500"
+                  isDelayed ? "border-l-red-500 bg-red-50/30" : isOverdue ? "border-l-amber-500 bg-amber-50/30" : "border-l-emerald-500"
                 )}>
                   <div className="flex items-center justify-between mb-2">
                     <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full",
-                      isDelayed ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+                      isDelayed ? "bg-red-100 text-red-700" : isOverdue ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
                     )}>
-                      {isDelayed ? '⚠ 지연 감지됨' : '진행 중'}
+                      {isDelayed ? '⚠ 지연 감지됨' : isOverdue ? '⏰ SLA 초과 (자동 감지)' : '진행 중'}
                     </span>
                     {assignee && (
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
@@ -457,6 +575,11 @@ export default function Pipeline() {
                       <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
                         <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${t.progress || 10}%` }} />
                       </div>
+                      {t.dueDate && (
+                        <div className={cn("text-[9px] font-bold mt-1.5", isOverdue ? "text-amber-700" : "text-gray-400")}>
+                          {formatDueLabel(t.dueDate)}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -466,8 +589,8 @@ export default function Pipeline() {
                       </button>
                     ) : (
                       <>
-                        <button onClick={() => handleSimulateDelay(t)} className="flex-1 py-2 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1">
-                          ⚠ 지연 테스트
+                        <button onClick={() => handleOpenDelayModal(t)} className="flex-1 py-2 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1">
+                          ⚠ 지연 보고
                         </button>
                         <button onClick={() => handleCompleteTask(t.id)} className="flex-[2] py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> 완료 처리

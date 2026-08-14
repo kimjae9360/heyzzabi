@@ -40,15 +40,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const actingUser = await getActingUser(request);
     const workloadDelta = Math.min(100, assignee.current_workload + (task.estimated_hours || 4) * 3);
 
+    // SLA 워처가 비교할 목표 완료 시각. estimated_hours를 실제 달력 시간으로 단순 환산한다
+    // (근무시간 캘린더 없이 쓸 수 있는 가장 정직한 근사치 - 8시간 업무 = 지금부터 8시간 뒤).
+    const now = new Date();
+    const dueDate = new Date(now.getTime() + (task.estimated_hours || 8) * 60 * 60 * 1000);
+
     const updated = await prisma.$transaction(async (tx) => {
       const t = await tx.task.update({
         where: { task_id: id },
-        data: { status: 'IN_PROGRESS', assignee_id: assignee.user_id, progress: 5, rejected_reason: null },
+        data: { status: 'IN_PROGRESS', assignee_id: assignee.user_id, progress: 5, rejected_reason: null, start_date: now, end_date: dueDate, sla_alerted_at: null },
         include: { planning: true, meeting: true },
       });
       await tx.user.update({ where: { user_id: assignee.user_id }, data: { current_workload: workloadDelta } });
       await tx.taskAssignmentLog.create({
-        data: { task_id: id, user_id: assignee.user_id, action: 'ASSIGNED' },
+        data: { task_id: id, user_id: assignee.user_id, action: 'ASSIGNED', note: assignmentReason },
       });
       await tx.notification.create({
         data: {

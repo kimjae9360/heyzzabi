@@ -22,6 +22,7 @@ const MIGRATIONS = [
   '20260813064411_add_research_reports',
   '20260813065234_add_knowledge_category',
   '20260813090000_add_chat_messages',
+  '20260814000000_add_task_sla_alert',
 ];
 
 async function main() {
