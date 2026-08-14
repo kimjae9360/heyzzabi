@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { Briefcase, Search, CheckCircle2, AlertCircle, Clock, AlertTriangle, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';

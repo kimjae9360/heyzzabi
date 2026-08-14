@@ -263,7 +263,7 @@ export default function ResearchPage() {
                       <div className="px-4 py-3 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
                         <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold">
                           <Clock className="w-3 h-3" />
-                          {new Date(clip.createdAtIso).toLocaleString('ko-KR')}
+                          {new Date(clip.timestamp).toLocaleString('ko-KR')}
                         </div>
                         <button 
                           onClick={() => createTaskFromClip(clip)}
@@ -296,7 +296,7 @@ export default function ResearchPage() {
                             <div className="line-clamp-2 text-xs whitespace-pre-wrap">{clip.content}</div>
                           </td>
                           <td className="px-4 py-3 text-center align-top text-[11px] text-gray-500 font-bold">
-                            {new Date(clip.createdAtIso).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                            {new Date(clip.timestamp).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
                           </td>
                           <td className="px-4 py-3 text-center align-top space-y-1.5">
                             <button 

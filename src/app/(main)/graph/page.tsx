@@ -28,7 +28,7 @@ interface GraphLink {
 export default function KnowledgeGraphPage() {
   const { projects, employees, tasks, meetings } = useAppStore();
   const [activeFilter, setActiveFilter] = useState<NodeType | 'all'>('all');
-  const fgRef = useRef<any>();
+  const fgRef = useRef<any>(null);
 
   const graphData = useMemo(() => {
     const nodes: GraphNode[] = [];
