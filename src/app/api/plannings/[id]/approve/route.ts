@@ -34,6 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               description: d.description,
               estimated_hours: d.estimatedHours,
               difficulty: d.difficulty,
+              difficulty_reason: d.difficultyReason,
               status: 'PENDING_DISTRIBUTION',
               project_id: planning.project_id,
               planning_id: planning.planning_id,

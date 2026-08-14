@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.description !== undefined) data.description = body.description || null;
     if (body.status !== undefined) data.status = body.status;
     if (body.priority !== undefined) data.priority = body.priority;
+    if (body.targetDueDate !== undefined) data.end_date = body.targetDueDate ? new Date(body.targetDueDate) : null;
     const project = await prisma.project.update({ where: { project_id: id }, data });
     return NextResponse.json(toProjectDTO(project));
   } catch (err) {

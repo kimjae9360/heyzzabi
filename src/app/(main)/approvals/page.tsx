@@ -69,10 +69,12 @@ export default function Approvals() {
                 <p className="text-xs font-bold text-gray-500">승인 대상 업무</p>
                 <p className="text-sm font-bold text-gray-900 mt-0.5">{approveTask.title}</p>
                 <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 font-medium">
-                  <span className={cn("px-2 py-0.5 rounded font-bold text-[10px]",
-                    approveTask.difficulty === 'High' ? "bg-red-100 text-red-700" :
-                    approveTask.difficulty === 'Medium' ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
-                  )}>{approveTask.difficulty}</span>
+                  <span
+                    title={approveTask.difficultyReason || '난이도 판단 근거가 기록되지 않은 업무입니다.'}
+                    className={cn("px-2 py-0.5 rounded font-bold text-[10px] cursor-help",
+                      approveTask.difficulty === 'High' ? "bg-red-100 text-red-700" :
+                      approveTask.difficulty === 'Medium' ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
+                    )}>{approveTask.difficulty}</span>
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{approveTask.estimatedHours}h</span>
                   <span>출처: {approveTask.source}</span>
                 </div>
@@ -223,10 +225,12 @@ export default function Approvals() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="font-bold text-sm text-gray-900">{task.title}</span>
-                          <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded",
-                            task.difficulty === 'High' ? "bg-red-100 text-red-700" :
-                            task.difficulty === 'Medium' ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
-                          )}>{task.difficulty}</span>
+                          <span
+                            title={task.difficultyReason || '난이도 판단 근거가 기록되지 않은 업무입니다.'}
+                            className={cn("text-[9px] font-black px-1.5 py-0.5 rounded cursor-help",
+                              task.difficulty === 'High' ? "bg-red-100 text-red-700" :
+                              task.difficulty === 'Medium' ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
+                            )}>{task.difficulty}</span>
                         </div>
                         <div className="text-[10px] text-gray-400 flex items-center gap-2 font-medium">
                           <span>출처: {task.source}</span>

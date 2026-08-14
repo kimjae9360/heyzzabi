@@ -53,6 +53,7 @@ export function toProjectDTO(project: Project & { _count?: { tasks: number; meet
     status: project.status,
     priority: project.priority,
     createdAt: project.created_at.toISOString(),
+    targetDueDate: project.end_date ? project.end_date.toISOString() : undefined,
     taskCount: project._count?.tasks,
     meetingCount: project._count?.meetings,
     // github_token은 절대 클라이언트로 내려보내지 않는다 - 연동 여부만 owner/repo로 표시
@@ -117,6 +118,7 @@ export function toTaskDTO(task: Task & { planning?: Planning | null; meeting?: M
     progress: task.progress,
     estimatedHours: task.estimated_hours ?? undefined,
     difficulty: task.difficulty ?? undefined,
+    difficultyReason: task.difficulty_reason ?? undefined,
     rejectedReason: task.rejected_reason ?? undefined,
     delayReason: task.delay_reason ?? undefined,
     completedAt: task.completed_at ? task.completed_at.toLocaleDateString('ko-KR') : undefined,

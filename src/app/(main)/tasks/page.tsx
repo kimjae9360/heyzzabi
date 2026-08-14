@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Briefcase, Search, CheckCircle2, AlertCircle, Clock, AlertTriangle, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { Briefcase, Search, CheckCircle2, AlertCircle, Clock, AlertTriangle, ChevronUp, ChevronDown, Sparkles, Settings } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 
@@ -90,9 +90,15 @@ export default function Tasks() {
                 <option value="all">전체 프로젝트 보기</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
-              <Link href="/projects" className="text-sm font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-100 transition-colors shadow-sm">
-                관리
-              </Link>
+              {selectedProjectId !== 'all' && (
+                <Link
+                  href={`/projects/${selectedProjectId}`}
+                  title="프로젝트 설정 (GitHub 연동 등)"
+                  className="flex items-center justify-center text-gray-500 bg-gray-50 border border-gray-200 rounded-lg w-9 h-9 hover:bg-gray-100 hover:text-gray-700 transition-colors shadow-sm"
+                >
+                  <Settings className="w-4 h-4" />
+                </Link>
+              )}
             </div>
             <div className="relative w-72">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -201,11 +207,14 @@ export default function Tasks() {
                         <div className="text-[12px] text-red-600 mt-0.5 font-medium">사유: {t.delayReason}</div>
                       )}
                       <div className="text-[12px] text-gray-400 flex items-center gap-2 mt-0.5">
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded font-bold",
-                          t.difficulty === 'High' ? "text-red-600 bg-red-50" :
-                          t.difficulty === 'Medium' ? "text-amber-600 bg-amber-50" : "text-gray-500 bg-gray-100"
-                        )}>
+                        <span
+                          title={t.difficulty ? (t.difficultyReason || '난이도 판단 근거가 기록되지 않은 업무입니다.') : undefined}
+                          className={cn(
+                            "px-1.5 py-0.5 rounded font-bold",
+                            t.difficulty && "cursor-help",
+                            t.difficulty === 'High' ? "text-red-600 bg-red-50" :
+                            t.difficulty === 'Medium' ? "text-amber-600 bg-amber-50" : "text-gray-500 bg-gray-100"
+                          )}>
                           {t.difficulty || '-'}
                         </span>
                         {t.completedAt && <span className="text-gray-400">완료: {t.completedAt}</span>}

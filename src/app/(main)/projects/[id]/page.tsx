@@ -2,11 +2,12 @@
 
 import { use, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, GitBranch, GitPullRequest, CircleDot, ExternalLink, Loader2, X, RefreshCw, Mic2, ListChecks, ArrowRight } from 'lucide-react';
+import { ChevronLeft, GitBranch, GitPullRequest, CircleDot, ExternalLink, Loader2, X, RefreshCw, Mic2, ListChecks, ArrowRight, CalendarClock, Check } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 interface ProjectDetail {
   id: string; title: string; description?: string; status: string; priority: string;
+  targetDueDate?: string;
   githubOwner?: string; githubRepo?: string; githubLinkedAt?: string;
   meetings: { id: string; title: string; date: string }[];
   tasks: { id: string; title: string; status: string }[];
@@ -34,17 +35,35 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [tokenInput, setTokenInput] = useState('');
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState('');
+  const [dueDateInput, setDueDateInput] = useState('');
+  const [savingDueDate, setSavingDueDate] = useState(false);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${id}`);
       if (!res.ok) { setNotFound(true); return; }
-      setProject(await res.json());
+      const data: ProjectDetail = await res.json();
+      setProject(data);
+      setDueDateInput(data.targetDueDate ? data.targetDueDate.slice(0, 10) : '');
     } finally {
       setLoading(false);
     }
   }, [id]);
+
+  const handleSaveDueDate = async () => {
+    setSavingDueDate(true);
+    try {
+      await fetch(`/api/projects/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDueDate: dueDateInput || null }),
+      });
+      await loadProject();
+    } finally {
+      setSavingDueDate(false);
+    }
+  };
 
   const loadActivity = useCallback(async () => {
     setActivityLoading(true);
@@ -100,7 +119,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
         <p>프로젝트를 찾을 수 없습니다.</p>
-        <Link href="/projects" className="text-blue-600 font-bold text-sm hover:underline">프로젝트 목록으로 →</Link>
+        <Link href="/pipeline" className="text-blue-600 font-bold text-sm hover:underline">업무관리로 →</Link>
       </div>
     );
   }
@@ -108,7 +127,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="flex flex-col h-full bg-[#f4f5f7] overflow-y-auto">
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm shrink-0">
-        <Link href="/projects" className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 mb-2"><ChevronLeft className="w-3.5 h-3.5" />프로젝트 목록</Link>
+        <Link href="/pipeline" className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1 mb-2"><ChevronLeft className="w-3.5 h-3.5" />업무관리로</Link>
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900">{project.title}</h2>
@@ -121,6 +140,31 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className="p-6 max-w-4xl mx-auto w-full space-y-6">
+        {/* Target Due Date */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+          <h3 className="font-black text-gray-900 flex items-center gap-2 mb-3"><CalendarClock className="w-4 h-4 text-gray-700" />목표 마감일</h3>
+          <p className="text-xs text-gray-500 mb-3">이 프로젝트가 언제까지 진행되어야 하는지를 나타내며, 업무관리 파이프라인의 D-day 표시와 향후 WBS 일정의 기준이 됩니다.</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dueDateInput}
+              onChange={e => setDueDateInput(e.target.value)}
+              disabled={!isAdmin}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            {isAdmin && (
+              <button
+                onClick={handleSaveDueDate}
+                disabled={savingDueDate || dueDateInput === (project.targetDueDate ? project.targetDueDate.slice(0, 10) : '')}
+                className="px-3 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" /> {savingDueDate ? '저장 중...' : '저장'}
+              </button>
+            )}
+          </div>
+          {!isAdmin && <p className="text-[10px] text-gray-400 mt-2">마감일 설정은 관리자만 가능합니다.</p>}
+        </div>
+
         {/* GitHub */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
           <h3 className="font-black text-gray-900 flex items-center gap-2 mb-3"><GitBranch className="w-4 h-4 text-gray-700" />GitHub 연동</h3>

@@ -149,6 +149,7 @@ model Task {
   progress        Int       @default(0) // 0-100
   estimated_hours Int?
   difficulty      String? // High / Medium / Low
+  difficulty_reason String? // AI가 기획서 내용을 근거로 난이도를 판단한 이유
   rejected_reason String? // 배분 반려 사유
   delay_reason    String? // 지연 사유
   start_date      DateTime? // 배분 승인되어 IN_PROGRESS로 전환된 시각

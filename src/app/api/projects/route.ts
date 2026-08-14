@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         priority: body.priority || 'NORMAL',
         status: 'IN_PROGRESS',
         author_id: user.user_id,
+        end_date: body.targetDueDate ? new Date(body.targetDueDate) : null,
       },
     });
     return NextResponse.json(toProjectDTO(project), { status: 201 });

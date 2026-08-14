@@ -100,13 +100,23 @@ export interface TaskDraft {
   description: string;
   estimatedHours: number;
   difficulty: 'High' | 'Medium' | 'Low';
+  difficultyReason: string;
 }
 
 // Role 2: 업무 분해가 - 기획서를 실행 가능한 업무 단위로 쪼갠다
 export async function breakdownProposalIntoTasks(proposalTitle: string, proposalContent: string): Promise<TaskDraft[]> {
   const result = await callJson<{ tasks: TaskDraft[] }>(
-    '당신은 업무 분해 전문가입니다. 주어진 기획서를 실행 가능한 3~7개의 세부 업무로 분해하고 JSON으로 반환하세요. 각 업무는 제목(title), 설명(description), 예상 소요시간(estimatedHours, 숫자), 난이도(difficulty: High/Medium/Low)를 가집니다. 형식: {"tasks": [{"title": string, "description": string, "estimatedHours": number, "difficulty": "High"|"Medium"|"Low"}]}',
+    '당신은 업무 분해 전문가입니다. 주어진 기획서를 실행 가능한 3~7개의 세부 업무로 분해하고 JSON으로 반환하세요. 각 업무는 제목(title), 설명(description), 예상 소요시간(estimatedHours, 숫자), 난이도(difficulty: High/Medium/Low), 그리고 그 난이도를 그렇게 판단한 구체적 근거(difficultyReason, 기획서 내용에 근거해 1문장)를 가집니다. 형식: {"tasks": [{"title": string, "description": string, "estimatedHours": number, "difficulty": "High"|"Medium"|"Low", "difficultyReason": string}]}',
     `기획서 제목: ${proposalTitle}\n\n기획서 본문:\n${proposalContent}`
+  );
+  return result.tasks;
+}
+
+// Role 2b: WBS 분해가 - 이미 배분 대기 중인 업무 하나를 더 작은 실행 단위로 쪼갠다 (수동 "AI로 쪼개기")
+export async function breakdownTaskIntoSubtasks(task: { title: string; description?: string; estimatedHours?: number }): Promise<TaskDraft[]> {
+  const result = await callJson<{ tasks: TaskDraft[] }>(
+    '당신은 WBS(작업 분할 구조) 전문가입니다. 주어진 업무 하나를 실행 가능한 2~4개의 더 작은 하위 업무로 분해하고 JSON으로 반환하세요. 하위 업무들의 예상 소요시간 합은 원래 업무의 예상 소요시간을 넘지 않아야 합니다. 각 하위 업무는 제목(title), 설명(description), 예상 소요시간(estimatedHours, 숫자), 난이도(difficulty: High/Medium/Low), 그 난이도 판단 근거(difficultyReason, 1문장)를 가집니다. 형식: {"tasks": [{"title": string, "description": string, "estimatedHours": number, "difficulty": "High"|"Medium"|"Low", "difficultyReason": string}]}',
+    `업무 제목: ${task.title}\n업무 설명: ${task.description || '(설명 없음)'}\n예상 소요시간: ${task.estimatedHours ?? '알 수 없음'}시간`
   );
   return result.tasks;
 }

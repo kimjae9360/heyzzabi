@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope, Loader2, Sparkles, CornerDownLeft, FolderKanban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
-import AiSidePanel from './AiSidePanel';
 
 const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?: Employee['level'] }[] = [
   { name: '홈', path: '/dashboard', icon: Home },
@@ -25,7 +24,7 @@ const LEVEL_RANK: Record<Employee['level'], number> = { member: 0, lead: 1, pm: 
 const LEVEL_LABEL: Record<Employee['level'], string> = { member: '직원', lead: '팀장', pm: '관리자' };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData, currentUser, fetchCurrentUser, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
+  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData, currentUser, fetchCurrentUser, logout } = useAppStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -408,24 +407,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
           {children}
         </main>
-        
-        {/* AI Side Panel */}
-        <AiSidePanel />
       </div>
-
-      {/* AI 비서 플로팅 버튼 */}
-      <button
-        onClick={toggleAiPanel}
-        title={isAiPanelOpen ? 'AI 비서 닫기' : 'AI 비서에게 물어보기'}
-        className={cn(
-          "fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full shadow-xl transition-all",
-          isAiPanelOpen
-            ? "bg-gray-900 text-white hover:bg-black"
-            : "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
-        )}
-      >
-        {isAiPanelOpen ? <X className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
-      </button>
     </div>
   );
 }

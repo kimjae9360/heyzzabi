@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
+import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download, Plus, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useAppStore, type TaskUiStatus, type Employee } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,7 @@ function DroppableColumn({ id, children }: { id: string; children: React.ReactNo
 }
 
 export default function Pipeline() {
-  const { meetings = [], tasks = [], employees = [], projects = [], fetchProjects, generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
+  const { meetings = [], tasks = [], employees = [], projects = [], fetchProjects, createProject, generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
 
   const [rejectModal, setRejectModal] = useState<RejectModal | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -68,7 +68,32 @@ export default function Pipeline() {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectPriority, setNewProjectPriority] = useState('NORMAL');
+  const [newProjectDueDate, setNewProjectDueDate] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
+
   const toggleExpanded = (id: string) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectTitle.trim()) return;
+    setCreatingProject(true);
+    try {
+      await createProject({
+        title: newProjectTitle.trim(),
+        description: newProjectDescription.trim() || undefined,
+        priority: newProjectPriority,
+        targetDueDate: newProjectDueDate || undefined,
+      });
+      setNewProjectTitle(''); setNewProjectDescription(''); setNewProjectPriority('NORMAL'); setNewProjectDueDate('');
+      setShowProjectForm(false);
+    } finally {
+      setCreatingProject(false);
+    }
+  };
 
   useEffect(() => { fetchProjects?.(); }, [fetchProjects]);
 
@@ -77,6 +102,11 @@ export default function Pipeline() {
     const projectParam = new URLSearchParams(window.location.search).get('project');
     if (projectParam) setSelectedProjectId(projectParam);
   }, []);
+
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const dDay = selectedProject?.targetDueDate
+    ? Math.ceil((new Date(selectedProject.targetDueDate).setHours(23, 59, 59, 999) - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
 
   const inProject = <T extends { projectId?: string }>(item: T) => selectedProjectId === 'all' || item.projectId === selectedProjectId;
 
@@ -245,6 +275,50 @@ export default function Pipeline() {
         </div>
       )}
 
+      {/* New Project Modal */}
+      {showProjectForm && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden border border-gray-100">
+            <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus className="text-blue-600 w-5 h-5" />새 프로젝트</h3>
+              <button onClick={() => setShowProjectForm(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleCreateProject} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">프로젝트 이름 *</label>
+                <input autoFocus required value={newProjectTitle} onChange={e => setNewProjectTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all" placeholder="예: Hey Zzabi 웹 리뉴얼" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">설명</label>
+                <textarea value={newProjectDescription} onChange={e => setNewProjectDescription(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm h-20 resize-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all" placeholder="프로젝트 설명 (선택)" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">우선순위</label>
+                  <select value={newProjectPriority} onChange={e => setNewProjectPriority(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none bg-gray-50 focus:bg-white">
+                    <option value="LOW">낮음</option>
+                    <option value="NORMAL">보통</option>
+                    <option value="HIGH">높음</option>
+                    <option value="URGENT">긴급</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">목표 마감일</label>
+                  <input type="date" value={newProjectDueDate} onChange={e => setNewProjectDueDate(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" />
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 -mt-2">목표 마감일은 나중에 WBS(작업 분할) 일정의 기준이 됩니다. 아직 정해지지 않았다면 비워둬도 됩니다.</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowProjectForm(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                <button type="submit" disabled={creatingProject || !newProjectTitle.trim()} className="px-5 py-2.5 text-sm font-bold bg-gray-900 hover:bg-black text-white rounded-lg transition-colors shadow-sm disabled:opacity-60">
+                  {creatingProject ? '생성 중...' : '생성'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Delay Report Modal */}
       {delayModal && (
         <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
@@ -331,12 +405,35 @@ export default function Pipeline() {
               <option value="all">전체 프로젝트 보기</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
-            <Link href="/projects" className="text-xs font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-100 transition-colors shadow-sm">
-              관리
-            </Link>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
-            <Activity className="w-3.5 h-3.5 animate-pulse" /> AI Engine Active
+            {selectedProjectId !== 'all' && selectedProject?.targetDueDate && (
+              <span
+                title={`목표 마감일: ${new Date(selectedProject.targetDueDate).toLocaleDateString('ko-KR')}`}
+                className={cn(
+                  "text-xs font-bold px-3 py-1.5 rounded-lg border shadow-sm whitespace-nowrap",
+                  dDay !== null && dDay < 0 ? "text-red-700 bg-red-50 border-red-200" :
+                  dDay !== null && dDay <= 3 ? "text-amber-700 bg-amber-50 border-amber-200" :
+                  "text-gray-600 bg-gray-50 border-gray-200"
+                )}
+              >
+                {dDay !== null && dDay < 0 ? `D+${-dDay} 초과` : `D-${dDay}`}
+              </span>
+            )}
+            {selectedProjectId !== 'all' && (
+              <Link
+                href={`/projects/${selectedProjectId}`}
+                title="프로젝트 설정 (GitHub 연동 등)"
+                className="flex items-center justify-center text-gray-500 bg-gray-50 border border-gray-200 rounded-lg w-8 h-[30px] hover:bg-gray-100 hover:text-gray-700 transition-colors shadow-sm"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </Link>
+            )}
+            <button
+              onClick={() => setShowProjectForm(true)}
+              title="새 프로젝트 만들기"
+              className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" /> 새 프로젝트
+            </button>
           </div>
           <Link href="/meetings" className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 hover:bg-blue-100 transition-colors">
             + 회의록 등록

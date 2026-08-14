@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
+import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -11,17 +12,39 @@ const PLANNED_INTEGRATIONS = [
   { id: 'gcal', name: 'Google Calendar', desc: '회의 일정에서 회의록을 생성하고 Action Item을 등록합니다.', icon: Calendar, color: 'green' },
 ];
 
-export default function Integrations() {
-  const { tasks, updateTaskStatus, setToast } = useAppStore();
+interface SyncResult {
+  completed: { taskTitle: string; projectTitle: string; prTitle: string; prNumber: number }[];
+  errors: string[];
+  checkedProjects: number;
+}
 
-  const simulateGithubMerge = () => {
-    // 진행 중인 업무 중 아무거나 하나 골라서 완료(shipped) 처리
-    const inProgress = tasks.find(t => t.status === 'in-progress');
-    if (inProgress) {
-      updateTaskStatus(inProgress.id, 'shipped');
-      setToast(`웹훅 동작: "${inProgress.title}" 업무가 완료(Shipped) 상태로 업데이트되었습니다.`, 'success');
-    } else {
-      setToast('진행 중인 업무가 없어 웹훅 시뮬레이션을 실행할 수 없습니다.', 'warning');
+export default function Integrations() {
+  const { setToast, fetchData } = useAppStore();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncGithub = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/integrations/github/sync', { method: 'POST' });
+      const data: SyncResult & { error?: string } = await res.json();
+      if (!res.ok) throw new Error(data.error || 'GitHub 동기화에 실패했습니다.');
+
+      if (data.checkedProjects === 0) {
+        setToast('GitHub가 연동된 프로젝트가 없습니다. 업무관리에서 프로젝트를 먼저 연동해 주세요.', 'warning');
+      } else if (data.completed.length > 0) {
+        const first = data.completed[0];
+        const rest = data.completed.length - 1;
+        setToast(`PR #${first.prNumber} 병합 확인 → "${first.taskTitle}" 완료 처리${rest > 0 ? ` 외 ${rest}건` : ''}`, 'success');
+      } else if (data.errors.length > 0) {
+        setToast(data.errors[0], 'error');
+      } else {
+        setToast('연동된 저장소를 확인했지만, 병합된 PR과 일치하는 진행 중인 업무가 없습니다.', 'info');
+      }
+      await fetchData();
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'GitHub 동기화에 실패했습니다.', 'error');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -36,7 +59,7 @@ export default function Integrations() {
 
       <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
         {/* GitHub - 프로젝트별 연동으로 이동 */}
-        <Link href="/projects" className="block bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all">
+        <Link href="/pipeline" className="block bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200">
@@ -48,26 +71,27 @@ export default function Integrations() {
               </div>
             </div>
             <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-              프로젝트에서 연동하기 <ArrowRight className="w-3.5 h-3.5" />
+              업무관리에서 프로젝트 선택 후 연동하기 <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
         </Link>
 
-        {/* 웹훅 시뮬레이터 (TM-003) */}
+        {/* GitHub PR 동기화 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 font-black text-blue-900 mb-1">
-              <Zap className="w-5 h-5 text-blue-600" /> 외부 웹훅 시뮬레이터 (TM-003)
+              <Zap className="w-5 h-5 text-blue-600" /> GitHub PR 동기화
             </div>
             <p className="text-sm text-blue-800">
-              실제 GitHub 또는 Slack의 웹훅 이벤트를 수신한 상황을 가정하여, 진행 중인 칸반 업무를 <strong>자동으로 완료 처리</strong>합니다.
+              연동된 프로젝트들의 GitHub 저장소에서 <strong>실제로 병합된 PR</strong>을 조회해, 제목이 일치하는 진행 중인 업무를 완료 처리합니다.
             </p>
           </div>
-          <button 
-            onClick={simulateGithubMerge}
-            className="shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-sm"
+          <button
+            onClick={syncGithub}
+            disabled={syncing}
+            className="shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-60"
           >
-            <CheckCircle2 className="w-4 h-4" /> PR Merged (시뮬레이션)
+            {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> 동기화 중...</> : <><Zap className="w-4 h-4" /> 지금 동기화</>}
           </button>
         </div>
 
