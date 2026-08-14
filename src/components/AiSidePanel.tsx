@@ -30,7 +30,6 @@ export default function AiSidePanel() {
     let contextStr = '';
     if (pathname.includes('/tasks')) contextStr = '[현재 화면: 칸반 보드] ';
     else if (pathname.includes('/meetings')) contextStr = '[현재 화면: 회의록 분석] ';
-    else if (pathname.includes('/graph')) contextStr = '[현재 화면: 지식 그래프] ';
     else if (pathname.includes('/research')) contextStr = '[현재 화면: 리서치/스크랩 보관함] ';
     else if (pathname.includes('/dashboard')) contextStr = '[현재 화면: 메인 대시보드] ';
 
@@ -56,7 +55,7 @@ export default function AiSidePanel() {
       if (isCommand) {
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: commandReply }]);
       } else {
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: `${contextStr}"${userMsg}"에 대한 리서치 결과입니다.\n\n해당 내용은 추후 컨텍스트 인식 및 지식 그래프와 연동될 예정입니다.`, query: userMsg }]);
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: `${contextStr}"${userMsg}"에 대한 리서치 결과입니다.\n\n해당 내용은 추후 컨텍스트 인식과 연동될 예정입니다.`, query: userMsg }]);
       }
       setIsLoading(false);
     }, 1200);
@@ -73,7 +72,7 @@ export default function AiSidePanel() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-600" />
-          <span className="font-bold text-gray-900 text-sm">AI 리서치 패널</span>
+          <span className="font-bold text-gray-900 text-sm">AI 비서</span>
         </div>
         <div className="flex items-center gap-1">
           <button 

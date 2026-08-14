@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Microscope, Send, Loader2, AlertTriangle, FileText, ChevronLeft, BookmarkMinus, Clock, BrainCircuit, CalendarPlus, Wand2, X, LayoutGrid, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
@@ -61,6 +61,30 @@ export default function ResearchPage() {
       setGeneratedReport(reportMd);
       setGeneratingReport(false);
     }, 1500);
+  };
+
+  const downloadReportAsPdf = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const escaped = generatedReport
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>주간 성과 요약 리포트</title>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; padding: 48px; max-width: 720px; margin: 0 auto; color: #111827; line-height: 1.7; white-space: pre-wrap; }
+      </style>
+      </head><body>${escaped}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const shareReportByEmail = () => {
+    const subject = encodeURIComponent('주간 성과 요약 리포트');
+    const body = encodeURIComponent(generatedReport);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const load = async () => {
@@ -225,6 +249,7 @@ export default function ResearchPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
+              {clips.length > 0 && <ResearchActivityChart clips={clips} />}
               {clips.filter(c => c.query.toLowerCase().includes(clipSearch.toLowerCase()) || c.content.toLowerCase().includes(clipSearch.toLowerCase())).length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <BookmarkMinus className="w-12 h-12 text-gray-300 mb-4" />
@@ -349,8 +374,8 @@ export default function ResearchPage() {
                   </div>
                   {!generatingReport && (
                     <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
-                      <button className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">PDF 다운로드</button>
-                      <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">이메일 공유</button>
+                      <button onClick={downloadReportAsPdf} className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">PDF 다운로드</button>
+                      <button onClick={shareReportByEmail} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">이메일 공유</button>
                     </div>
                   )}
                 </div>
@@ -358,6 +383,78 @@ export default function ResearchPage() {
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ResearchActivityChart({ clips }: { clips: { timestamp: string }[] }) {
+  const DAYS = 14;
+  const buckets = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (DAYS - 1));
+    const days = Array.from({ length: DAYS }, (_, i) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      return { date, count: 0 };
+    });
+    clips.forEach(c => {
+      const diff = Math.floor((new Date(c.timestamp).getTime() - start.getTime()) / 86400000);
+      if (diff >= 0 && diff < DAYS) days[diff].count++;
+    });
+    return days;
+  }, [clips]);
+
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const max = Math.max(1, ...buckets.map(b => b.count));
+  const last7 = buckets.slice(-7).reduce((s, b) => s + b.count, 0);
+  const prev7 = buckets.slice(0, 7).reduce((s, b) => s + b.count, 0);
+  const delta = last7 - prev7;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-6">
+      <div className="flex items-end justify-between mb-4">
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">최근 14일 스크랩 추이</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-gray-900">{clips.length}</span>
+            <span className="text-xs font-bold text-gray-400">건 전체</span>
+          </div>
+        </div>
+        <div className={cn(
+          "text-xs font-bold px-2 py-1 rounded-md",
+          delta > 0 ? "text-emerald-700 bg-emerald-50" : delta < 0 ? "text-red-600 bg-red-50" : "text-gray-500 bg-gray-50"
+        )}>
+          {delta > 0 ? '▲' : delta < 0 ? '▼' : '–'} 지난주 대비 {Math.abs(delta)}건
+        </div>
+      </div>
+      <div className="flex items-end gap-1.5 h-24 border-b border-gray-200">
+        {buckets.map((b, i) => (
+          <div
+            key={i}
+            className="flex-1 relative h-full flex flex-col items-center justify-end group"
+            onMouseEnter={() => setHoverIdx(i)}
+            onMouseLeave={() => setHoverIdx(null)}
+          >
+            {hoverIdx === i && (
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap z-10 shadow-lg pointer-events-none">
+                {b.date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} · {b.count}건
+              </div>
+            )}
+            <div
+              className={cn(
+                "w-full max-w-[18px] rounded-t transition-colors",
+                b.count > 0 ? "bg-blue-600 group-hover:bg-blue-700" : "bg-gray-100"
+              )}
+              style={{ height: b.count > 0 ? `${Math.max((b.count / max) * 100, 6)}%` : '2px' }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between mt-1.5 text-[9px] font-bold text-gray-400">
+        <span>{buckets[0].date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
+        <span>오늘</span>
       </div>
     </div>
   );

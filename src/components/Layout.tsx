@@ -16,7 +16,6 @@ const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?
   { name: '결재함', path: '/approvals', icon: CheckSquare, minLevel: 'lead' },
   { name: '직원관리', path: '/employees', icon: Users, minLevel: 'pm' },
   { name: '챗봇', path: '/knowledge', icon: Network },
-  { name: '지식그래프', path: '/graph', icon: BrainCircuit },
   { name: 'AI 리서치', path: '/research', icon: Microscope },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },
@@ -269,21 +268,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2">
-          {/* AI Panel Toggle */}
-          <button
-            onClick={toggleAiPanel}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm border",
-              isAiPanelOpen 
-                ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700" 
-                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600"
-            )}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">AI 리서치</span>
-          </button>
-
-          <div className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
 
           {/* Notification Bell */}
           <div ref={notifRef} className="relative">
@@ -428,6 +412,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* AI Side Panel */}
         <AiSidePanel />
       </div>
+
+      {/* AI 비서 플로팅 버튼 */}
+      <button
+        onClick={toggleAiPanel}
+        title={isAiPanelOpen ? 'AI 비서 닫기' : 'AI 비서에게 물어보기'}
+        className={cn(
+          "fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full shadow-xl transition-all",
+          isAiPanelOpen
+            ? "bg-gray-900 text-white hover:bg-black"
+            : "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
+        )}
+      >
+        {isAiPanelOpen ? <X className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
+      </button>
     </div>
   );
 }

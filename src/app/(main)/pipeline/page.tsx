@@ -297,7 +297,7 @@ export default function Pipeline() {
                 <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[11px] font-black shrink-0">{dropConfirm.employee.avatar}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-gray-900">{dropConfirm.employee.name} <span className="text-gray-400 font-normal text-xs">({dropConfirm.employee.role})</span></div>
-                  <div className="text-[10px] text-indigo-700/70">근거: {dropConfirm.scoreInfo.reason} · 적합도 {Math.round(dropConfirm.scoreInfo.score)}</div>
+                  <div className="text-[12px] text-indigo-700/70">근거: {dropConfirm.scoreInfo.reason} · 적합도 {Math.round(dropConfirm.scoreInfo.score)}</div>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-5">
@@ -348,18 +348,18 @@ export default function Pipeline() {
       <div className="bg-white border-b border-gray-100 px-6 py-2 shrink-0 flex items-center gap-0 overflow-hidden">
         {columns.map((col, i) => (
           <div key={col.phase} className="flex items-center flex-1 min-w-0">
-            <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold",
+            <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-bold",
               col.color === 'indigo' ? "text-indigo-700 bg-indigo-50" :
               col.color === 'amber' ? "text-amber-700 bg-amber-50" :
               col.color === 'emerald' ? "text-emerald-700 bg-emerald-50" : "text-gray-600 bg-gray-50"
             )}>
-              <span className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white",
+              <span className={cn("w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black text-white",
                 col.color === 'indigo' ? "bg-indigo-500" :
                 col.color === 'amber' ? "bg-amber-500" :
                 col.color === 'emerald' ? "bg-emerald-500" : "bg-gray-400"
               )}>{col.phase}</span>
               {col.title.replace('Phase ' + col.phase + '. ', '')}
-              <span className={cn("px-1.5 py-0.5 rounded-full text-[9px] font-black",
+              <span className={cn("px-1.5 py-0.5 rounded-full text-[11px] font-black",
                 col.color === 'indigo' ? "bg-indigo-200 text-indigo-800" :
                 col.color === 'amber' ? "bg-amber-200 text-amber-800" :
                 col.color === 'emerald' ? "bg-emerald-200 text-emerald-800" : "bg-gray-200 text-gray-700"
@@ -378,7 +378,7 @@ export default function Pipeline() {
         <div className="flex-shrink-0 w-[300px] flex flex-col">
           <div className="flex items-center justify-between mb-3 bg-blue-100 px-3 py-2 rounded-lg border-l-4 border-blue-500">
             <h3 className="font-bold text-blue-900 text-xs flex items-center gap-1.5"><Mic className="w-3.5 h-3.5" /> Phase 1. 회의 요약</h3>
-            <span className="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{meetingsRaw.length}</span>
+            <span className="bg-blue-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full">{meetingsRaw.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pb-4">
             {meetingsRaw.length === 0 && (
@@ -390,23 +390,23 @@ export default function Pipeline() {
             {meetingsRaw.map((m) => (
               <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-all">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">RAW</span>
-                  <span className="text-[9px] text-gray-400">{m.date}</span>
+                  <span className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">RAW</span>
+                  <span className="text-[11px] text-gray-400">{m.date}</span>
                 </div>
                 <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
                 <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
-                  <p className={cn("text-[10px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
+                  <p className={cn("text-[12px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
                     {expandedCards[m.id] ? m.summary.join('\n') : m.summary.slice(0, 3).join(' ')}
                   </p>
                   {m.summary.length > 0 && (
-                    <button onClick={() => toggleExpanded(m.id)} className="text-[9px] font-bold text-blue-600 hover:text-blue-800 mt-1">
+                    <button onClick={() => toggleExpanded(m.id)} className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-1">
                       {expandedCards[m.id] ? '접기 ▴' : '더보기 ▾'}
                     </button>
                   )}
                 </div>
                 <button
                   onClick={() => handleGenerateProposal(m.id)}
-                  className="w-full py-2 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  className="w-full py-2 text-[12px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
                 >
                   <BrainCircuit className="w-3.5 h-3.5" /> AI 요약 및 기획서 생성
                 </button>
@@ -419,7 +419,7 @@ export default function Pipeline() {
         <div className="flex-shrink-0 w-[300px] flex flex-col">
           <div className="flex items-center justify-between mb-3 bg-indigo-100 px-3 py-2 rounded-lg border-l-4 border-indigo-500">
             <h3 className="font-bold text-indigo-900 text-xs flex items-center gap-1.5"><FileSignature className="w-3.5 h-3.5" /> Phase 2. 기획서 검토</h3>
-            <span className="bg-indigo-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{meetingsWaiting.length}</span>
+            <span className="bg-indigo-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full">{meetingsWaiting.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pb-4">
             {meetingsWaiting.length === 0 && (
@@ -431,18 +431,18 @@ export default function Pipeline() {
             {meetingsWaiting.map((m) => (
               <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 transition-all">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">PROPOSAL</span>
-                  <span className="text-[9px] text-gray-400">{m.date}</span>
+                  <span className="text-[11px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">PROPOSAL</span>
+                  <span className="text-[11px] text-gray-400">{m.date}</span>
                 </div>
                 <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
                 <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
-                  <p className={cn("text-[10px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
+                  <p className={cn("text-[12px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
                     {expandedCards[m.id]
                       ? (m.proposalContent || '기획서 내용 없음')
                       : (m.proposalContent?.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 3).join(' ') || '기획서 내용 없음')}
                   </p>
                   {m.proposalContent && (
-                    <button onClick={() => toggleExpanded(m.id)} className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 mt-1">
+                    <button onClick={() => toggleExpanded(m.id)} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 mt-1">
                       {expandedCards[m.id] ? '접기 ▴' : '더보기 ▾'}
                     </button>
                   )}
@@ -450,20 +450,20 @@ export default function Pipeline() {
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => downloadPPT(m.id)}
-                    className="w-full py-2 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                    className="w-full py-2 text-[12px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1 shadow-sm"
                   >
                     <Download className="w-3 h-3" /> PPTX로 자동 생성 (다운로드)
                   </button>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleRejectProposal(m.id, m.title)}
-                      className="flex-1 py-2 text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 py-2 text-[12px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1"
                     >
                       <AlertCircle className="w-3 h-3" /> 반려
                     </button>
                     <button
                       onClick={() => handleExtractTasks(m.id)}
-                      className="flex-[2] py-2 text-[10px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                      className="flex-[2] py-2 text-[12px] font-bold text-white bg-gray-900 hover:bg-black rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
                     >
                       <BrainCircuit className="w-3.5 h-3.5" /> 검토완료 → 배분 요청
                     </button>
@@ -478,7 +478,7 @@ export default function Pipeline() {
         <div className="flex-shrink-0 w-[300px] flex flex-col">
           <div className="flex items-center justify-between mb-3 bg-amber-100 px-3 py-2 rounded-lg border-l-4 border-amber-500">
             <h3 className="font-bold text-amber-900 text-xs flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Phase 3. 배분 승인</h3>
-            <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{pendingTasks.length}</span>
+            <span className="bg-amber-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full">{pendingTasks.length}</span>
           </div>
           <DroppableColumn id="col-distribution">
             {pendingTasks.length === 0 && (
@@ -499,28 +499,28 @@ export default function Pipeline() {
                   t.rejectedReason && "border-l-red-400"
                 )}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full",
+                    <span className={cn("text-[11px] font-black px-2 py-0.5 rounded-full",
                       t.rejectedReason ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                     )}>
                       {t.rejectedReason ? '재검토 필요' : 'AI 추천 대기'}
                     </span>
-                    <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{t.estimatedHours}h</span>
+                    <span className="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{t.estimatedHours}h</span>
                   </div>
                   {t.rejectedReason && (
-                    <div className="mb-2 text-[9px] text-red-600 bg-red-50 px-2 py-1.5 rounded-lg border border-red-100 font-medium">
+                    <div className="mb-2 text-[11px] text-red-600 bg-red-50 px-2 py-1.5 rounded-lg border border-red-100 font-medium">
                       <span className="font-black">이전 반려 사유:</span> {t.rejectedReason}
                     </div>
                   )}
                   <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{t.title}</h4>
-                  <p className="text-[9px] text-gray-400 mb-2">출처: {t.source}</p>
+                  <p className="text-[11px] text-gray-400 mb-2">출처: {t.source}</p>
                   {selectedEmp && (
                     <div className="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-100">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-[9px] font-bold text-blue-600">
+                        <div className="text-[11px] font-bold text-blue-600">
                           {manualAssignees[t.id] ? '수동 지정 담당자' : 'AI 추천 담당자'}
                         </div>
                         <select
-                          className="text-[10px] font-bold text-gray-700 bg-white border border-blue-200 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                          className="text-[12px] font-bold text-gray-700 bg-white border border-blue-200 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
                           value={selectedEmp.id}
                           onChange={(e) => setManualAssignees(prev => ({ ...prev, [t.id]: e.target.value }))}
                         >
@@ -530,34 +530,34 @@ export default function Pipeline() {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">{selectedEmp.avatar}</div>
+                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[12px] font-black shrink-0">{selectedEmp.avatar}</div>
                         <div>
                           <div className="text-[11px] font-bold text-gray-900">{selectedEmp.name} <span className="text-gray-400 font-normal">({selectedEmp.role})</span></div>
-                          <div className={cn("text-[9px] font-bold", selectedEmp.currentWorkload > 80 ? "text-red-600" : selectedEmp.currentWorkload > 60 ? "text-amber-600" : "text-emerald-600")}>
+                          <div className={cn("text-[11px] font-bold", selectedEmp.currentWorkload > 80 ? "text-red-600" : selectedEmp.currentWorkload > 60 ? "text-amber-600" : "text-emerald-600")}>
                             현재 부하: {selectedEmp.currentWorkload}%
                           </div>
                         </div>
                         {selectedScore && (
-                          <span className="ml-auto shrink-0 text-[9px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                          <span className="ml-auto shrink-0 text-[11px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
                             적합도 {Math.round(selectedScore.score)}
                           </span>
                         )}
                       </div>
                       {selectedScore && (
-                        <p className="mt-1.5 text-[9px] text-blue-700/70 leading-relaxed">근거: {selectedScore.reason}</p>
+                        <p className="mt-1.5 text-[11px] text-blue-700/70 leading-relaxed">근거: {selectedScore.reason}</p>
                       )}
                     </div>
                   )}
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleRejectDistribution(t.id, t.title)}
-                      className="flex-1 py-2 text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 py-2 text-[12px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1"
                     >
                       <AlertCircle className="w-3 h-3" /> 반려
                     </button>
                     <button
                       onClick={() => handleApproveDistribution(t)}
-                      className="flex-[2] py-2 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors flex items-center justify-center gap-1"
+                      className="flex-[2] py-2 text-[12px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors flex items-center justify-center gap-1"
                     >
                       <User className="w-3.5 h-3.5" /> 배분 승인 (결재)
                     </button>
@@ -573,7 +573,7 @@ export default function Pipeline() {
         <div className="flex-shrink-0 w-[300px] flex flex-col">
           <div className="flex items-center justify-between mb-3 bg-emerald-100 px-3 py-2 rounded-lg border-l-4 border-emerald-500">
             <h3 className="font-bold text-emerald-900 text-xs flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> Phase 4. 진행 추적</h3>
-            <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{activeTasks.length}</span>
+            <span className="bg-emerald-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full">{activeTasks.length}</span>
           </div>
           <DroppableColumn id="col-progress">
             {activeTasks.length === 0 && (
@@ -592,7 +592,7 @@ export default function Pipeline() {
                   isDelayed ? "border-l-red-500 bg-red-50/30" : isOverdue ? "border-l-amber-500 bg-amber-50/30" : "border-l-emerald-500"
                 )}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full",
+                    <span className={cn("text-[11px] font-black px-2 py-0.5 rounded-full",
                       isDelayed ? "bg-red-100 text-red-700" : isOverdue ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
                     )}>
                       {isDelayed ? '⚠ 지연 감지됨' : isOverdue ? '⏰ SLA 초과 (자동 감지)' : '진행 중'}
@@ -600,26 +600,26 @@ export default function Pipeline() {
                     {assignee && (
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
                         <div className="w-3.5 h-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[7px] font-black">{assignee.avatar}</div>
-                        <span className="text-[9px] font-bold text-gray-700">{assignee.name}</span>
+                        <span className="text-[11px] font-bold text-gray-700">{assignee.name}</span>
                       </div>
                     )}
                   </div>
                   <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-3 line-clamp-2">{t.title}</h4>
                   {isDelayed ? (
-                    <div className="mb-3 text-[10px]">
+                    <div className="mb-3 text-[12px]">
                       <div className="text-red-700 font-bold mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 지연 사유 수집됨</div>
                       <div className="p-2 bg-white rounded-lg border border-red-200 text-gray-600 leading-snug">"{t.delayReason}"</div>
                     </div>
                   ) : (
                     <div className="mb-3">
-                      <div className="flex justify-between text-[9px] font-bold text-gray-500 mb-1">
+                      <div className="flex justify-between text-[11px] font-bold text-gray-500 mb-1">
                         <span>진행률</span><span>{t.progress || 10}%</span>
                       </div>
                       <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
                         <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${t.progress || 10}%` }} />
                       </div>
                       {t.dueDate && (
-                        <div className={cn("text-[9px] font-bold mt-1.5", isOverdue ? "text-amber-700" : "text-gray-400")}>
+                        <div className={cn("text-[11px] font-bold mt-1.5", isOverdue ? "text-amber-700" : "text-gray-400")}>
                           {formatDueLabel(t.dueDate)}
                         </div>
                       )}
@@ -627,15 +627,15 @@ export default function Pipeline() {
                   )}
                   <div className="flex gap-2">
                     {isDelayed ? (
-                      <button onClick={() => handleReallocate(t)} className="w-full py-2 text-[10px] font-bold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1">
+                      <button onClick={() => handleReallocate(t)} className="w-full py-2 text-[12px] font-bold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1">
                         <BrainCircuit className="w-3.5 h-3.5" /> AI 재조정안 승인
                       </button>
                     ) : (
                       <>
-                        <button onClick={() => handleOpenDelayModal(t)} className="flex-1 py-2 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1">
+                        <button onClick={() => handleOpenDelayModal(t)} className="flex-1 py-2 text-[12px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors flex items-center justify-center gap-1">
                           ⚠ 지연 보고
                         </button>
-                        <button onClick={() => handleCompleteTask(t.id)} className="flex-[2] py-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
+                        <button onClick={() => handleCompleteTask(t.id)} className="flex-[2] py-2 text-[12px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> 완료 처리
                         </button>
                       </>
@@ -652,7 +652,7 @@ export default function Pipeline() {
         <div className="flex-shrink-0 w-[300px] flex flex-col opacity-70 hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-between mb-3 bg-gray-200 px-3 py-2 rounded-lg border-l-4 border-gray-400">
             <h3 className="font-bold text-gray-700 text-xs flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Phase 5. 완료됨</h3>
-            <span className="bg-gray-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">{shippedTasks.length}</span>
+            <span className="bg-gray-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full">{shippedTasks.length}</span>
           </div>
           <DroppableColumn id="col-done">
             {shippedTasks.length === 0 && (
@@ -663,11 +663,11 @@ export default function Pipeline() {
               return (
                 <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">✓ 완료</span>
-                    {t.completedAt && <span className="text-[9px] text-gray-400">{t.completedAt}</span>}
+                    <span className="text-[11px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">✓ 완료</span>
+                    {t.completedAt && <span className="text-[11px] text-gray-400">{t.completedAt}</span>}
                   </div>
                   <h4 className="font-bold text-gray-500 text-xs line-through mb-1">{t.title}</h4>
-                  {assignee && <p className="text-[9px] text-gray-400">{assignee.name}</p>}
+                  {assignee && <p className="text-[11px] text-gray-400">{assignee.name}</p>}
                 </div>
               );
             })}
