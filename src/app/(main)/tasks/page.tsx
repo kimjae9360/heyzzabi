@@ -170,16 +170,19 @@ export default function Tasks() {
             <p className="text-gray-500 text-sm mt-0.5">파이프라인에서 배분된 전체 업무의 세부 상태를 조회하고 진행률을 관리합니다.</p>
           </div>
           <div className="flex items-center gap-3">
-            {projects.length > 1 && (
+            <div className="flex items-center gap-2">
               <select
                 value={selectedProjectId}
                 onChange={e => setSelectedProjectId(e.target.value)}
-                className="text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 cursor-pointer"
+                className="text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 cursor-pointer shadow-sm"
               >
-                <option value="all">전체 프로젝트</option>
+                <option value="all">전체 프로젝트 보기</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
-            )}
+              <Link href="/projects" className="text-sm font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-100 transition-colors shadow-sm">
+                관리
+              </Link>
+            </div>
             <div className="relative w-72">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
