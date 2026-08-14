@@ -23,6 +23,7 @@ const MIGRATIONS = [
   '20260813065234_add_knowledge_category',
   '20260813090000_add_chat_messages',
   '20260814000000_add_task_sla_alert',
+  '20260814010000_add_project_github',
 ];
 
 async function main() {

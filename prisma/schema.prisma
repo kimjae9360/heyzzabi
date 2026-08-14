@@ -63,6 +63,13 @@ model Project {
   created_at   DateTime  @default(now())
   updated_at   DateTime  @updatedAt
 
+  // GitHub 연동 - 프로젝트별, 저장소 주소만 입력하면 연동 (OAuth 앱 등록/env 설정 불필요).
+  // 비공개 저장소이거나 API 요청 한도를 늘리려면 토큰(선택)을 함께 저장한다.
+  github_owner     String?
+  github_repo      String?
+  github_token     String? // Personal Access Token, 평문 저장 (로컬 개발용 - IntegrationConnection.access_token과 동일한 정책)
+  github_linked_at DateTime?
+
   // Relations
   author_id String
   author    User       @relation("ProjectAuthor", fields: [author_id], references: [user_id])

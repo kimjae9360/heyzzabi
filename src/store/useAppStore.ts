@@ -40,6 +40,8 @@ export interface Project {
   createdAt: string;
   taskCount?: number;
   meetingCount?: number;
+  githubOwner?: string;
+  githubRepo?: string;
 }
 
 export interface Meeting {

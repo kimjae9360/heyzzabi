@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { FolderKanban, Plus, X, Mic2, ListChecks, Loader2 } from 'lucide-react';
+import { FolderKanban, Plus, X, Mic2, ListChecks, Loader2, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 const STATUS_LABEL: Record<string, string> = { PLANNED: '계획', IN_PROGRESS: '진행중', COMPLETED: '완료', SUSPENDED: '중단', HOLD: '보류' };
@@ -59,7 +59,7 @@ export default function ProjectsPage() {
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {projects.map((p) => (
-              <Link key={p.id} href={`/pipeline?project=${p.id}`} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all block">
+              <Link key={p.id} href={`/projects/${p.id}`} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all block">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">{STATUS_LABEL[p.status] ?? p.status}</span>
                   <span className="text-[9px] font-bold text-gray-400">{PRIORITY_LABEL[p.priority] ?? p.priority}</span>
@@ -69,7 +69,11 @@ export default function ProjectsPage() {
                 <div className="flex items-center gap-3 text-[10px] text-gray-400">
                   <span className="flex items-center gap-1"><Mic2 className="w-3 h-3" />{p.meetingCount ?? 0}개 회의</span>
                   <span className="flex items-center gap-1"><ListChecks className="w-3 h-3" />{p.taskCount ?? 0}개 업무</span>
-                  <span className="ml-auto text-blue-600 font-bold">업무관리에서 보기 →</span>
+                  {p.githubOwner && p.githubRepo ? (
+                    <span className="ml-auto flex items-center gap-1 text-emerald-600 font-bold"><GitBranch className="w-3 h-3" />{p.githubOwner}/{p.githubRepo}</span>
+                  ) : (
+                    <span className="ml-auto text-blue-600 font-bold">자세히 보기 →</span>
+                  )}
                 </div>
               </Link>
             ))}

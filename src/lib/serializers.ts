@@ -55,6 +55,10 @@ export function toProjectDTO(project: Project & { _count?: { tasks: number; meet
     createdAt: project.created_at.toISOString(),
     taskCount: project._count?.tasks,
     meetingCount: project._count?.meetings,
+    // github_token은 절대 클라이언트로 내려보내지 않는다 - 연동 여부만 owner/repo로 표시
+    githubOwner: project.github_owner ?? undefined,
+    githubRepo: project.github_repo ?? undefined,
+    githubLinkedAt: project.github_linked_at ? project.github_linked_at.toISOString() : undefined,
   };
 }
 

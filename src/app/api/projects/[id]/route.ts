@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { toProjectDTO } from '@/lib/serializers';
+import { toProjectDTO, toMeetingDTO, toTaskDTO } from '@/lib/serializers';
 import { getActingUser } from '@/lib/currentUser';
+
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const project = await prisma.project.findUnique({
+    where: { project_id: id },
+    include: { _count: { select: { tasks: true, meetings: true } } },
+  });
+  if (!project) return NextResponse.json({ error: '프로젝트를 찾을 수 없습니다.' }, { status: 404 });
+
+  const [meetings, tasks] = await Promise.all([
+    prisma.meeting.findMany({ where: { project_id: id }, include: { plannings: true }, orderBy: { meeting_date: 'desc' } }),
+    prisma.task.findMany({ where: { project_id: id }, include: { planning: true, meeting: true }, orderBy: { created_at: 'desc' } }),
+  ]);
+
+  return NextResponse.json({
+    ...toProjectDTO(project),
+    meetings: meetings.map(toMeetingDTO),
+    tasks: tasks.map(toTaskDTO),
+  });
+}
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
