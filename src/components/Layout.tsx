@@ -6,16 +6,17 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope, Loader2, Sparkles, CornerDownLeft, FolderKanban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
+import AiSidePanel from './AiSidePanel';
 
 const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?: Employee['level'] }[] = [
   { name: '홈', path: '/dashboard', icon: Home },
-  { name: '프로젝트', path: '/projects', icon: FolderKanban },
   { name: '회의분석', path: '/meetings', icon: Mic2 },
   { name: '업무관리', path: '/pipeline', icon: Briefcase },
   { name: '업무보드', path: '/tasks', icon: ListChecks },
   { name: '결재함', path: '/approvals', icon: CheckSquare, minLevel: 'lead' },
   { name: '직원관리', path: '/employees', icon: Users, minLevel: 'pm' },
   { name: '챗봇', path: '/knowledge', icon: Network },
+  { name: '지식그래프', path: '/graph', icon: BrainCircuit },
   { name: 'AI 리서치', path: '/research', icon: Microscope },
   { name: '연동', path: '/integrations', icon: Link2 },
   { name: '설정', path: '/settings', icon: Settings },
@@ -25,7 +26,7 @@ const LEVEL_RANK: Record<Employee['level'], number> = { member: 0, lead: 1, pm: 
 const LEVEL_LABEL: Record<Employee['level'], string> = { member: '직원', lead: '팀장', pm: '관리자' };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData, currentUser, fetchCurrentUser, logout } = useAppStore();
+  const { toast, clearToast, notifications = [], markAllNotificationsRead, tasks = [], meetings = [], fetchData, currentUser, fetchCurrentUser, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -268,6 +269,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2">
+          {/* AI Panel Toggle */}
+          <button
+            onClick={toggleAiPanel}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm border",
+              isAiPanelOpen 
+                ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700" 
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600"
+            )}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden sm:inline">AI 리서치</span>
+          </button>
+
+          <div className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+
           {/* Notification Bell */}
           <div ref={notifRef} className="relative">
             <button
@@ -407,6 +424,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
           {children}
         </main>
+        
+        {/* AI Side Panel */}
+        <AiSidePanel />
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight } from 'lucide-react';
+import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppStore } from '@/store/useAppStore';
 
 const PLANNED_INTEGRATIONS = [
   { id: 'slack', name: 'Slack', desc: '배분 승인, 지연 감지, 완료 알림을 지정 채널에 전송합니다.', icon: MessageSquare, color: 'purple' },
@@ -11,6 +12,19 @@ const PLANNED_INTEGRATIONS = [
 ];
 
 export default function Integrations() {
+  const { tasks, updateTaskStatus, setToast } = useAppStore();
+
+  const simulateGithubMerge = () => {
+    // 진행 중인 업무 중 아무거나 하나 골라서 완료(shipped) 처리
+    const inProgress = tasks.find(t => t.status === 'in-progress');
+    if (inProgress) {
+      updateTaskStatus(inProgress.id, 'shipped');
+      setToast(`웹훅 동작: "${inProgress.title}" 업무가 완료(Shipped) 상태로 업데이트되었습니다.`, 'success');
+    } else {
+      setToast('진행 중인 업무가 없어 웹훅 시뮬레이션을 실행할 수 없습니다.', 'warning');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#f4f5f7] overflow-y-auto">
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm shrink-0">
@@ -39,11 +53,29 @@ export default function Integrations() {
           </div>
         </Link>
 
+        {/* 웹훅 시뮬레이터 (TM-003) */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-black text-blue-900 mb-1">
+              <Zap className="w-5 h-5 text-blue-600" /> 외부 웹훅 시뮬레이터 (TM-003)
+            </div>
+            <p className="text-sm text-blue-800">
+              실제 GitHub 또는 Slack의 웹훅 이벤트를 수신한 상황을 가정하여, 진행 중인 칸반 업무를 <strong>자동으로 완료 처리</strong>합니다.
+            </p>
+          </div>
+          <button 
+            onClick={simulateGithubMerge}
+            className="shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-sm"
+          >
+            <CheckCircle2 className="w-4 h-4" /> PR Merged (시뮬레이션)
+          </button>
+        </div>
+
         {/* 나머지 - 준비 중 */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
           <Construction className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800">
-            <strong>나머지는 준비 중인 기능입니다.</strong> 실제 연동이 없는 상태에서 "연동됨"처럼 보이는 가짜 상태를 표시하지 않습니다.
+            <strong>아래는 준비 중인 기능입니다.</strong> 실제 연동이 없는 상태에서 "연동됨"처럼 보이는 가짜 상태를 표시하지 않습니다.
           </div>
         </div>
 

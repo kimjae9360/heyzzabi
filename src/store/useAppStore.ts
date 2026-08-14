@@ -62,6 +62,13 @@ export interface Meeting {
   projectId?: string;
 }
 
+export interface ResearchClip {
+  id: string;
+  query: string;
+  content: string;
+  timestamp: string;
+}
+
 export type TaskUiStatus = 'pending-distribution' | 'in-progress' | 'delayed' | 'shipped';
 
 export interface Task {
@@ -134,6 +141,17 @@ interface AppState {
 
   fetchData: () => Promise<void>;
 
+  // AI Panel
+  isAiPanelOpen: boolean;
+  toggleAiPanel: () => void;
+  openAiPanel: () => void;
+  closeAiPanel: () => void;
+  
+  // Research Clips
+  clips: ResearchClip[];
+  addClip: (clip: Omit<ResearchClip, 'id' | 'timestamp'>) => void;
+  removeClip: (id: string) => void;
+
   // Projects
   fetchProjects: () => Promise<void>;
   createProject: (data: { title: string; description?: string; priority?: string }) => Promise<void>;
@@ -158,6 +176,8 @@ interface AppState {
   reallocateTask: (taskId: string) => Promise<void>;
   updateTaskStatus: (taskId: string, status: TaskUiStatus) => Promise<void>;
   updateTaskProgress: (taskId: string, progress: number) => Promise<void>;
+  createTaskFromClip: (clip: ResearchClip) => Promise<void>;
+  splitTaskByAi: (taskId: string) => Promise<void>;
 
   // Employees
   addEmployee: (emp: Omit<Employee, 'id' | 'currentWorkload' | 'avatar' | 'employeeNo' | 'createdAt'>) => Promise<void>;
@@ -217,6 +237,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   authChecked: false,
   loading: false,
   toast: null,
+  isAiPanelOpen: false,
+  clips: [],
+
+  toggleAiPanel: () => set(state => ({ isAiPanelOpen: !state.isAiPanelOpen })),
+  openAiPanel: () => set({ isAiPanelOpen: true }),
+  closeAiPanel: () => set({ isAiPanelOpen: false }),
+
+  addClip: (clip) => {
+    const newClip: ResearchClip = {
+      ...clip,
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+    };
+    set(state => ({ clips: [newClip, ...state.clips] }));
+    get().setToast('리서치 결과가 클리핑 되었습니다.', 'success');
+  },
+  
+  removeClip: (id) => {
+    set(state => ({ clips: state.clips.filter(c => c.id !== id) }));
+    get().setToast('리서치 클립이 삭제되었습니다.', 'info');
+  },
 
   fetchCurrentUser: async () => {
     try {
@@ -431,6 +472,66 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '진행률 저장에 실패했습니다.', type: 'error' } });
     }
+  },
+
+  createTaskFromClip: async (clip) => {
+    try {
+      // Create a local optimistic task
+      const newTask: Task = {
+        id: crypto.randomUUID(),
+        title: clip.query,
+        source: 'AI 리서치 스크랩',
+        status: 'pending-distribution',
+        progress: 0,
+        estimatedHours: 2,
+        difficulty: 'Medium',
+        createdAtIso: new Date().toISOString()
+      };
+      set(state => ({ tasks: [newTask, ...state.tasks] }));
+      get().setToast('스크랩한 리서치를 기반으로 새로운 업무가 생성되었습니다.', 'success');
+    } catch (err) {
+      set({ toast: { message: '업무 생성에 실패했습니다.', type: 'error' } });
+    }
+  },
+
+  splitTaskByAi: async (taskId) => {
+    const parentTask = get().tasks.find(t => t.id === taskId);
+    if (!parentTask) return;
+    
+    set({ loading: true });
+    
+    // 모의 딜레이
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const subTask1: Task = {
+      id: crypto.randomUUID(),
+      title: `[기획] ${parentTask.title} 요건 정의`,
+      source: 'AI 자동 생성 (WBS)',
+      status: 'pending-distribution',
+      progress: 0,
+      estimatedHours: 1,
+      difficulty: 'Low',
+      projectId: parentTask.projectId,
+      createdAtIso: new Date().toISOString()
+    };
+    
+    const subTask2: Task = {
+      id: crypto.randomUUID(),
+      title: `[실행] ${parentTask.title} 구현 및 반영`,
+      source: 'AI 자동 생성 (WBS)',
+      status: 'pending-distribution',
+      progress: 0,
+      estimatedHours: parentTask.estimatedHours ? Math.ceil(parentTask.estimatedHours * 0.8) : 3,
+      difficulty: parentTask.difficulty || 'Medium',
+      projectId: parentTask.projectId,
+      createdAtIso: new Date().toISOString()
+    };
+    
+    set(state => ({
+      tasks: [subTask1, subTask2, ...state.tasks],
+      loading: false,
+      toast: { message: `AI가 "${parentTask.title}" 업무를 2개의 세부 업무로 분할했습니다.`, type: 'success' }
+    }));
   },
 
   addEmployee: async (emp) => {
