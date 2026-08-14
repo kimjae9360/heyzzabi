@@ -222,16 +222,19 @@ export default function Tasks() {
                             />
                           </div>
                           {isInProgress && (
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              step={5}
-                              value={t.progress || 0}
-                              onChange={e => updateTaskProgress(t.id, Number(e.target.value))}
-                              className="w-full h-1 mt-1 accent-blue-500 cursor-pointer"
-                              title="진행률 조정"
-                            />
+                            <div className="w-full mt-1">
+                              <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                step={5}
+                                value={t.progress || 0}
+                                onChange={e => updateTaskProgress(t.id, Number(e.target.value))}
+                                className="w-full h-2.5 cursor-pointer accent-blue-600"
+                                title="드래그해서 진행률 조정"
+                              />
+                              <div className="text-center text-[8px] font-bold text-blue-400 leading-none mt-0.5">드래그하여 조정</div>
+                            </div>
                           )}
                         </>
                       )}
