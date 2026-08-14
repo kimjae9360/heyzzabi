@@ -46,8 +46,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (actingUser.user_id === id) {
       return NextResponse.json({ error: '자기 자신의 계정은 삭제할 수 없습니다.' }, { status: 400 });
     }
-    await prisma.user.delete({ where: { user_id: id } });
-    return NextResponse.json({ ok: true });
+    // 업무·회의·승인 등 과거 이력이 User를 참조하므로 물리 삭제하지 않는다.
+    // 삭제 요청은 퇴사 상태로 전환해 기본 직원 목록에서 제외한다.
+    await prisma.user.update({
+      where: { user_id: id },
+      data: { status: 'RESIGNED', current_workload: 0 },
+    });
+    return NextResponse.json({ ok: true, retired: true });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : '직원 삭제에 실패했습니다.' }, { status: 500 });
   }

@@ -481,7 +481,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeEmployee: async (empId) => {
     try {
       await apiFetch(`/api/employees/${empId}`, { method: 'DELETE' });
-      set(state => ({ employees: state.employees.filter(e => e.id !== empId), toast: { message: '직원이 삭제되었습니다.', type: 'info' } }));
+      await get().fetchData();
+      set({ toast: { message: '직원이 퇴사 처리되어 기본 목록에서 제외되었습니다.', type: 'info' } });
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '직원 삭제에 실패했습니다.', type: 'error' } });
     }

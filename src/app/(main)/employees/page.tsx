@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { UserPlus, Users, Search, Trash2, Pencil, X, Save, Mail, Phone, BadgeCheck, ShieldAlert, CircleSlash, Moon } from 'lucide-react';
 import { useAppStore, type Employee, type EmployeeStatus } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
+import { filterEmployeeDirectory } from '@/lib/employeeDirectory';
 import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN, SKILL_SUGGESTIONS, CERT_SUGGESTIONS, splitEmail } from '@/lib/employeeOptions';
 import TagAutocomplete from '@/components/TagAutocomplete';
 
@@ -65,14 +66,11 @@ export default function Employees() {
         e.employeeNo.toLowerCase().includes(q)
       );
     }
-    if (filterStatus !== 'all') {
-      result = result.filter(e => e.status === filterStatus);
-    }
-    return result;
+    return filterEmployeeDirectory(result, filterStatus);
   }, [employees, query, filterStatus]);
 
   const statusCounts = {
-    all: employees.length,
+    all: filterEmployeeDirectory(employees, 'all').length,
     ACTIVE: employees.filter(e => e.status === 'ACTIVE').length,
     LEAVE: employees.filter(e => e.status === 'LEAVE').length,
     RESIGNED: employees.filter(e => e.status === 'RESIGNED').length,
@@ -134,7 +132,7 @@ export default function Employees() {
   };
 
   const handleRemove = (id: string, name: string) => {
-    if (window.confirm(`${name}님을 직원 목록에서 삭제하시겠습니까?`)) {
+    if (window.confirm(`${name}님을 퇴사 처리로 진행하시겠습니까?\n업무·회의 이력은 보존되고 퇴사 목록으로 이동합니다.`)) {
       removeEmployee(id);
     }
   };
@@ -420,7 +418,7 @@ export default function Employees() {
                       <button
                         onClick={() => handleRemove(emp.id, emp.name)}
                         className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="삭제"
+                        title="삭제 (퇴사 처리)"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -434,7 +432,7 @@ export default function Employees() {
 
         {filtered.length > 0 && (
           <div className="mt-3 text-xs text-gray-400 text-center">
-            총 {filtered.length}명 / 전체 {employees.length}명 표시 중
+            총 {filtered.length}명 / 전체 {statusCounts.all}명 표시 중
           </div>
         )}
       </div>
