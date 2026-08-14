@@ -82,12 +82,13 @@ export default function Pipeline() {
     if (!newProjectTitle.trim()) return;
     setCreatingProject(true);
     try {
-      await createProject({
+      const created = await createProject({
         title: newProjectTitle.trim(),
         description: newProjectDescription.trim() || undefined,
         priority: newProjectPriority,
         targetDueDate: newProjectDueDate || undefined,
       });
+      if (created) setSelectedProjectId(created.id);
       setNewProjectTitle(''); setNewProjectDescription(''); setNewProjectPriority('NORMAL'); setNewProjectDueDate('');
       setShowProjectForm(false);
     } finally {
@@ -109,6 +110,18 @@ export default function Pipeline() {
     : null;
 
   const inProject = <T extends { projectId?: string }>(item: T) => selectedProjectId === 'all' || item.projectId === selectedProjectId;
+
+  // "전체 프로젝트 보기"에서는 카드가 여러 프로젝트에 섞여 나오므로 소속을 배지로 구분해준다.
+  const ProjectBadge = ({ projectId }: { projectId?: string }) => {
+    if (selectedProjectId !== 'all' || !projectId) return null;
+    const title = projects.find(p => p.id === projectId)?.title;
+    if (!title) return null;
+    return (
+      <span title={title} className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-full border border-purple-100 truncate max-w-[110px] shrink-0">
+        {title}
+      </span>
+    );
+  };
 
   const meetingsRaw = meetings.filter(m => !m.hasProposal && inProject(m));
   const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted && inProject(m));
@@ -486,9 +499,10 @@ export default function Pipeline() {
             )}
             {meetingsRaw.map((m) => (
               <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">RAW</span>
-                  <span className="text-[11px] text-gray-400">{m.date}</span>
+                <div className="flex items-center justify-between mb-2 gap-1.5">
+                  <span className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">RAW</span>
+                  <ProjectBadge projectId={m.projectId} />
+                  <span className="text-[11px] text-gray-400 shrink-0">{m.date}</span>
                 </div>
                 <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
                 <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
@@ -527,9 +541,10 @@ export default function Pipeline() {
             )}
             {meetingsWaiting.map((m) => (
               <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">PROPOSAL</span>
-                  <span className="text-[11px] text-gray-400">{m.date}</span>
+                <div className="flex items-center justify-between mb-2 gap-1.5">
+                  <span className="text-[11px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold shrink-0">PROPOSAL</span>
+                  <ProjectBadge projectId={m.projectId} />
+                  <span className="text-[11px] text-gray-400 shrink-0">{m.date}</span>
                 </div>
                 <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
                 <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
@@ -609,7 +624,10 @@ export default function Pipeline() {
                     </div>
                   )}
                   <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{t.title}</h4>
-                  <p className="text-[11px] text-gray-400 mb-2">출처: {t.source}</p>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <p className="text-[11px] text-gray-400 flex-1 min-w-0 truncate">출처: {t.source}</p>
+                    <ProjectBadge projectId={t.projectId} />
+                  </div>
                   {selectedEmp && (
                     <div className="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-100">
                       <div className="flex items-center justify-between mb-2">
@@ -701,7 +719,10 @@ export default function Pipeline() {
                       </div>
                     )}
                   </div>
-                  <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-3 line-clamp-2">{t.title}</h4>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <h4 title={t.title} className="font-bold text-gray-900 text-xs line-clamp-2 flex-1 min-w-0">{t.title}</h4>
+                    <ProjectBadge projectId={t.projectId} />
+                  </div>
                   {isDelayed ? (
                     <div className="mb-3 text-[12px]">
                       <div className="text-red-700 font-bold mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 지연 사유 수집됨</div>
@@ -759,9 +780,10 @@ export default function Pipeline() {
               const assignee = employees.find(e => e.id === t.assigneeId);
               return (
                 <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">✓ 완료</span>
-                    {t.completedAt && <span className="text-[11px] text-gray-400">{t.completedAt}</span>}
+                  <div className="flex items-center justify-between mb-2 gap-1.5">
+                    <span className="text-[11px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full shrink-0">✓ 완료</span>
+                    <ProjectBadge projectId={t.projectId} />
+                    {t.completedAt && <span className="text-[11px] text-gray-400 shrink-0">{t.completedAt}</span>}
                   </div>
                   <h4 className="font-bold text-gray-500 text-xs line-through mb-1">{t.title}</h4>
                   {assignee && <p className="text-[11px] text-gray-400">{assignee.name}</p>}

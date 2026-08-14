@@ -138,7 +138,7 @@ interface AppState {
 
   // Projects
   fetchProjects: () => Promise<void>;
-  createProject: (data: { title: string; description?: string; priority?: string; targetDueDate?: string }) => Promise<void>;
+  createProject: (data: { title: string; description?: string; priority?: string; targetDueDate?: string }) => Promise<Project | null>;
 
   // Meetings
   addMeeting: (data: { title: string; content: string; projectId?: string }) => Promise<void>;
@@ -278,11 +278,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createProject: async ({ title, description, priority, targetDueDate }) => {
     try {
-      await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ title, description, priority, targetDueDate }) });
+      const created = await apiFetch<Project>('/api/projects', { method: 'POST', body: JSON.stringify({ title, description, priority, targetDueDate }) });
       await get().fetchProjects();
       set({ toast: { message: `'${title}' 프로젝트가 생성되었습니다.`, type: 'success' } });
+      return created;
     } catch (err) {
       set({ toast: { message: err instanceof Error ? err.message : '프로젝트 생성에 실패했습니다.', type: 'error' } });
+      return null;
     }
   },
 

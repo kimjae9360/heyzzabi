@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Mic, FileText, CheckSquare, Search, Download, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle, Upload, Paperclip } from 'lucide-react';
+import { Mic, FileText, CheckSquare, Search, Download, FolderOpen, Loader2, BrainCircuit, FileSignature, Trash2, Edit3, Save, X, ChevronRight, BarChart3, AlertCircle, Upload, Paperclip, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
 type MeetingTab = 'raw' | 'analysis' | 'proposal';
 
 export default function Meetings() {
-  const { meetings = [], projects = [], fetchProjects, generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
+  const { meetings = [], projects = [], fetchProjects, createProject, generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<MeetingTab>('raw');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -25,9 +25,27 @@ export default function Meetings() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [creatingProjectInline, setCreatingProjectInline] = useState(false);
+  const [inlineProjectTitle, setInlineProjectTitle] = useState('');
+  const [savingInlineProject, setSavingInlineProject] = useState(false);
 
   useEffect(() => { fetchProjects?.(); }, [fetchProjects]);
   useEffect(() => { if (!newProjectId && projects.length > 0) setNewProjectId(projects[0].id); }, [projects, newProjectId]);
+
+  const handleCreateProjectInline = async () => {
+    if (!inlineProjectTitle.trim() || !createProject) return;
+    setSavingInlineProject(true);
+    try {
+      const created = await createProject({ title: inlineProjectTitle.trim() });
+      if (created) {
+        setNewProjectId(created.id);
+        setInlineProjectTitle('');
+        setCreatingProjectInline(false);
+      }
+    } finally {
+      setSavingInlineProject(false);
+    }
+  };
 
   const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
   const filteredMeetings = meetings.filter(m =>
@@ -160,14 +178,49 @@ export default function Meetings() {
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">회의 제목 *</label>
                   <input autoFocus required value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="예: [주간회의] 8월 2주차 스프린트 플래닝" />
                 </div>
-                {projects.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">프로젝트</label>
-                    <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                      {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">프로젝트</label>
+                  {creatingProjectInline ? (
+                    <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50 space-y-2">
+                      <input
+                        autoFocus
+                        value={inlineProjectTitle}
+                        onChange={e => setInlineProjectTitle(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateProjectInline(); } }}
+                        placeholder="새 프로젝트 이름"
+                        className="w-full border border-gray-300 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => { setCreatingProjectInline(false); setInlineProjectTitle(''); }} className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                        <button
+                          type="button"
+                          onClick={handleCreateProjectInline}
+                          disabled={!inlineProjectTitle.trim() || savingInlineProject}
+                          className="px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 disabled:opacity-50 transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" /> {savingInlineProject ? '생성 중...' : '생성'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {projects.length > 0 ? (
+                        <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="flex-1 border border-gray-300 rounded-lg p-3 text-sm outline-none bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                          {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                        </select>
+                      ) : (
+                        <div className="flex-1 flex items-center px-3 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg">등록된 프로젝트가 없습니다.</div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCreatingProjectInline(true)}
+                        className="shrink-0 flex items-center gap-1 px-3 py-2.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> 새 프로젝트
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">파일에서 불러오기 <span className="text-gray-400 font-normal">(음성 mp3/wav/m4a, 문서 txt/md/docx/pdf)</span></label>
                   <label className={cn(
