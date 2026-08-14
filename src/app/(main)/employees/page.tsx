@@ -351,7 +351,7 @@ export default function Employees() {
                           </span>
                         </div>
                         <div className="text-[10px] text-gray-400 flex items-center gap-2 mt-0.5">
-                          <span className="flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0" />{emp.email}</span>
+                          <span title={emp.email} className="flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0" />{emp.email}</span>
                           {emp.phone && <span className="flex items-center gap-0.5 shrink-0"><Phone className="w-2.5 h-2.5" />{emp.phone}</span>}
                         </div>
                       </div>

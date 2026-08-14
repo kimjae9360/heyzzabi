@@ -65,6 +65,9 @@ export default function Pipeline() {
   const [delayModal, setDelayModal] = useState<DelayModal | null>(null);
   const [delayReason, setDelayReason] = useState('');
   const [dropConfirm, setDropConfirm] = useState<DropConfirm | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (id: string) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
 
   const meetingsRaw = meetings.filter(m => !m.hasProposal);
   const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted);
@@ -366,10 +369,17 @@ export default function Pipeline() {
                   <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">RAW</span>
                   <span className="text-[9px] text-gray-400">{m.date}</span>
                 </div>
-                <h4 className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
-                <p className="text-[10px] text-gray-500 line-clamp-3 mb-3 bg-gray-50 p-2 rounded-lg leading-relaxed border">
-                  {m.summary.slice(0, 3).join(' ')}
-                </p>
+                <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
+                <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
+                  <p className={cn("text-[10px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
+                    {expandedCards[m.id] ? m.summary.join('\n') : m.summary.slice(0, 3).join(' ')}
+                  </p>
+                  {m.summary.length > 0 && (
+                    <button onClick={() => toggleExpanded(m.id)} className="text-[9px] font-bold text-blue-600 hover:text-blue-800 mt-1">
+                      {expandedCards[m.id] ? '접기 ▴' : '더보기 ▾'}
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => handleGenerateProposal(m.id)}
                   className="w-full py-2 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
@@ -400,10 +410,19 @@ export default function Pipeline() {
                   <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">PROPOSAL</span>
                   <span className="text-[9px] text-gray-400">{m.date}</span>
                 </div>
-                <h4 className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
-                <p className="text-[10px] text-gray-500 line-clamp-3 mb-3 bg-gray-50 p-2 rounded-lg leading-relaxed border">
-                  {m.proposalContent?.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 3).join(' ') || '기획서 내용 없음'}
-                </p>
+                <h4 title={m.title} className="font-bold text-gray-900 text-xs mb-2 line-clamp-2">{m.title}</h4>
+                <div className="mb-3 bg-gray-50 p-2 rounded-lg border">
+                  <p className={cn("text-[10px] text-gray-500 leading-relaxed whitespace-pre-wrap", !expandedCards[m.id] && "line-clamp-3")}>
+                    {expandedCards[m.id]
+                      ? (m.proposalContent || '기획서 내용 없음')
+                      : (m.proposalContent?.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 3).join(' ') || '기획서 내용 없음')}
+                  </p>
+                  {m.proposalContent && (
+                    <button onClick={() => toggleExpanded(m.id)} className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 mt-1">
+                      {expandedCards[m.id] ? '접기 ▴' : '더보기 ▾'}
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => downloadPPT(m.id)}
@@ -468,7 +487,7 @@ export default function Pipeline() {
                       <span className="font-black">이전 반려 사유:</span> {t.rejectedReason}
                     </div>
                   )}
-                  <h4 className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{t.title}</h4>
+                  <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{t.title}</h4>
                   <p className="text-[9px] text-gray-400 mb-2">출처: {t.source}</p>
                   {selectedEmp && (
                     <div className="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-100">
@@ -561,7 +580,7 @@ export default function Pipeline() {
                       </div>
                     )}
                   </div>
-                  <h4 className="font-bold text-gray-900 text-xs mb-3 line-clamp-2">{t.title}</h4>
+                  <h4 title={t.title} className="font-bold text-gray-900 text-xs mb-3 line-clamp-2">{t.title}</h4>
                   {isDelayed ? (
                     <div className="mb-3 text-[10px]">
                       <div className="text-red-700 font-bold mb-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> 지연 사유 수집됨</div>

@@ -187,7 +187,7 @@ export default function Tasks() {
                     </div>
 
                     {/* Source */}
-                    <div className="col-span-3 text-xs text-gray-500 truncate font-medium">{t.source}</div>
+                    <div title={t.source} className="col-span-3 text-xs text-gray-500 truncate font-medium">{t.source}</div>
 
                     {/* Assignee */}
                     <div className="col-span-2 flex justify-center">

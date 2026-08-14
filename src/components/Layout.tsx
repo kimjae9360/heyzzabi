@@ -37,6 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [aiSources, setAiSources] = useState<{ sourceType: string; sourceId: string; title: string }[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const isComposingRef = useRef(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -143,7 +144,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
-                onKeyDown={e => e.key === 'Enter' && handleAskAi()}
+                onCompositionStart={() => { isComposingRef.current = true; }}
+                onCompositionEnd={() => { isComposingRef.current = false; }}
+                onKeyUp={e => {
+                  // 한글 IME 입력 중 Enter를 누르면 그 Enter가 조합 확정(compositionend)에 먼저
+                  // 소비되어 keydown이 아예 안 오는 브라우저가 있다 - 사용자가 Enter를 눌러도
+                  // 검색이 안 되는 것처럼 보이는 원인. keyup은 조합이 끝난 뒤 안정적으로 오므로
+                  // keydown 대신 keyup에서 처리하고, 조합 중 Enter는 한 번 더 걸러낸다.
+                  if (e.key !== 'Enter' || isComposingRef.current || e.nativeEvent.isComposing) return;
+                  handleAskAi();
+                }}
                 placeholder='자연어 질의: "김개발 업무량은?", "인증 버그 회의록 찾아줘" (Enter로 AI 질의)'
                 className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400"
               />
@@ -216,7 +226,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               <r.icon className="w-4 h-4 text-blue-600" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-gray-900 truncate">{r.label}</div>
+                              <div title={r.label} className="text-sm font-bold text-gray-900 truncate">{r.label}</div>
                               <div className="text-[10px] text-gray-400">{r.sub}</div>
                             </div>
                             <span className="text-[9px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded shrink-0">{r.type}</span>

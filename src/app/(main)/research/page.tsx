@@ -113,7 +113,7 @@ export default function ResearchPage() {
                   {r.degraded && <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">근거 부족</span>}
                   <span className="text-[9px] text-gray-400">{r.sourceCount}건 참고</span>
                 </div>
-                <p className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{r.question}</p>
+                <p title={r.question} className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{r.question}</p>
                 <p className="text-[10px] text-gray-400">{r.createdBy} · {new Date(r.createdAt).toLocaleString('ko-KR')}</p>
               </button>
             ))}

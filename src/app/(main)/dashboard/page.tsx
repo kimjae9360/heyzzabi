@@ -299,7 +299,7 @@ export default function Dashboard() {
                     n.type === 'error' ? "bg-red-500" : "bg-blue-500"
                   )} />
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-xs leading-snug line-clamp-2", !n.read ? "font-bold text-gray-900" : "text-gray-500")}>{n.message}</p>
+                    <p title={n.message} className={cn("text-xs leading-snug line-clamp-2", !n.read ? "font-bold text-gray-900" : "text-gray-500")}>{n.message}</p>
                     <p className="text-[9px] text-gray-400 mt-0.5">{n.timestamp}</p>
                   </div>
                 </Link>

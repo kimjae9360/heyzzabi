@@ -233,10 +233,10 @@ export default function Meetings() {
                   </span>
                   <span className="text-[10px] text-gray-400">{meeting.date}</span>
                 </div>
-                <h3 className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{meeting.title}</h3>
+                <h3 title={meeting.title} className="font-bold text-gray-900 text-xs mb-1 line-clamp-2">{meeting.title}</h3>
                 <p className="text-[10px] text-gray-400">{meeting.summary.length}개 안건</p>
                 {meeting.isProposalRejected && (
-                  <div className="mt-2 text-[9px] text-red-600 bg-red-50 rounded px-2 py-1 font-medium border border-red-100 line-clamp-1">
+                  <div className="mt-2 text-[9px] text-red-600 bg-red-50 rounded px-2 py-1 font-medium border border-red-100 leading-relaxed">
                     반려 사유: {meeting.proposalRejectedReason}
                   </div>
                 )}
