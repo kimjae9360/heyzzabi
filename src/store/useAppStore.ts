@@ -31,6 +31,17 @@ export interface StructuredAnalysis {
   actionItems: string[];
 }
 
+export interface Project {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  taskCount?: number;
+  meetingCount?: number;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -46,6 +57,7 @@ export interface Meeting {
   proposalRejectedReason?: string;
 
   isTasksExtracted: boolean;
+  projectId?: string;
 }
 
 export type TaskUiStatus = 'pending-distribution' | 'in-progress' | 'delayed' | 'shipped';
@@ -65,6 +77,7 @@ export interface Task {
   completedAtIso?: string;
   createdAtIso: string;
   dueDate?: string;
+  projectId?: string;
 }
 
 export interface Notification {
@@ -107,6 +120,7 @@ interface AppState {
   tasks: Task[];
   employees: Employee[];
   notifications: Notification[];
+  projects: Project[];
 
   currentUser: Employee | null;
   authChecked: boolean;
@@ -118,8 +132,12 @@ interface AppState {
 
   fetchData: () => Promise<void>;
 
+  // Projects
+  fetchProjects: () => Promise<void>;
+  createProject: (data: { title: string; description?: string; priority?: string }) => Promise<void>;
+
   // Meetings
-  addMeeting: (data: { title: string; content: string }) => Promise<void>;
+  addMeeting: (data: { title: string; content: string; projectId?: string }) => Promise<void>;
   deleteMeeting: (meetingId: string) => Promise<void>;
 
   // Pipeline phase 1: Meeting -> Proposal (real AI call)
@@ -157,7 +175,7 @@ interface MeetingApiDTO {
   id: string; title: string; date: string; meetingDateIso: string; summary: string[]; hasProposal: boolean;
   proposalId?: string; proposalTitle?: string; proposalContent?: string;
   analysis?: StructuredAnalysis; isProposalApproved: boolean; isTasksExtracted: boolean;
-  isProposalRejected: boolean; proposalRejectedReason?: string;
+  isProposalRejected: boolean; proposalRejectedReason?: string; projectId?: string;
 }
 function mapMeeting(m: MeetingApiDTO): Meeting {
   return {
@@ -165,6 +183,7 @@ function mapMeeting(m: MeetingApiDTO): Meeting {
     analysis: m.analysis, hasProposal: m.hasProposal, proposalContent: m.proposalContent,
     isProposalApproved: m.isProposalApproved, isTasksExtracted: m.isTasksExtracted,
     isProposalRejected: m.isProposalRejected, proposalRejectedReason: m.proposalRejectedReason,
+    projectId: m.projectId,
   };
 }
 
@@ -172,6 +191,7 @@ interface TaskApiDTO {
   id: string; title: string; description?: string; source: string; status: string;
   assigneeId?: string; progress: number; estimatedHours?: number; difficulty?: string;
   rejectedReason?: string; delayReason?: string; completedAt?: string; completedAtIso?: string; createdAtIso: string; dueDateIso?: string;
+  projectId?: string;
 }
 function mapTask(t: TaskApiDTO): Task | null {
   const status = DB_TASK_STATUS_TO_UI[t.status];
@@ -181,7 +201,7 @@ function mapTask(t: TaskApiDTO): Task | null {
     assigneeId: t.assigneeId, progress: t.progress, estimatedHours: t.estimatedHours,
     difficulty: t.difficulty as Task['difficulty'], rejectedReason: t.rejectedReason,
     delayReason: t.delayReason, completedAt: t.completedAt, completedAtIso: t.completedAtIso, createdAtIso: t.createdAtIso,
-    dueDate: t.dueDateIso,
+    dueDate: t.dueDateIso, projectId: t.projectId,
   };
 }
 
@@ -190,6 +210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tasks: [],
   employees: [],
   notifications: [],
+  projects: [],
   currentUser: null,
   authChecked: false,
   loading: false,
@@ -221,17 +242,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchData: async () => {
     set({ loading: true });
     try {
-      const [meetings, tasks, employees, notifications] = await Promise.all([
+      const [meetings, tasks, employees, notifications, projects] = await Promise.all([
         apiFetch<MeetingApiDTO[]>('/api/meetings'),
         apiFetch<TaskApiDTO[]>('/api/tasks'),
         apiFetch<Employee[]>('/api/employees'),
         apiFetch<Notification[]>('/api/notifications'),
+        apiFetch<Project[]>('/api/projects'),
       ]);
       set({
         meetings: meetings.map(mapMeeting),
         tasks: tasks.map(mapTask).filter((t): t is Task => t !== null),
         employees,
         notifications,
+        projects,
         loading: false,
       });
     } catch (err) {
@@ -239,9 +262,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  addMeeting: async ({ title, content }) => {
+  fetchProjects: async () => {
     try {
-      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content }) });
+      const projects = await apiFetch<Project[]>('/api/projects');
+      set({ projects });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '프로젝트를 불러오지 못했습니다.', type: 'error' } });
+    }
+  },
+
+  createProject: async ({ title, description, priority }) => {
+    try {
+      await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ title, description, priority }) });
+      await get().fetchProjects();
+      set({ toast: { message: `'${title}' 프로젝트가 생성되었습니다.`, type: 'success' } });
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : '프로젝트 생성에 실패했습니다.', type: 'error' } });
+    }
+  },
+
+  addMeeting: async ({ title, content, projectId }) => {
+    try {
+      await apiFetch('/api/meetings', { method: 'POST', body: JSON.stringify({ title, content, projectId }) });
       await get().fetchData();
       set({ toast: { message: '회의록이 등록되었습니다.', type: 'success' } });
     } catch (err) {

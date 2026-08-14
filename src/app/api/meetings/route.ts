@@ -18,11 +18,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '제목과 내용은 필수입니다.' }, { status: 400 });
     }
     const user = await getActingUser(request);
-    let project = await prisma.project.findFirst({ orderBy: { created_at: 'asc' } });
-    if (!project) {
-      project = await prisma.project.create({
-        data: { title: '기본 프로젝트', author_id: user.user_id, status: 'IN_PROGRESS' },
-      });
+    let project;
+    if (body.projectId) {
+      project = await prisma.project.findUnique({ where: { project_id: body.projectId } });
+      if (!project) return NextResponse.json({ error: '선택한 프로젝트를 찾을 수 없습니다.' }, { status: 404 });
+    } else {
+      project = await prisma.project.findFirst({ orderBy: { created_at: 'asc' } });
+      if (!project) {
+        project = await prisma.project.create({
+          data: { title: '기본 프로젝트', author_id: user.user_id, status: 'IN_PROGRESS' },
+        });
+      }
     }
     const meeting = await prisma.meeting.create({
       data: {

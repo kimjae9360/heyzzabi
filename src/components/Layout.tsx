@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope, Loader2, Sparkles, CornerDownLeft } from 'lucide-react';
+import { Home, Mic2, Briefcase, Link2, Settings, Bell, X, BrainCircuit, CheckSquare, Search, GitBranch, FileText, Clock, Network, Users, ListChecks, ChevronDown, LogOut, Microscope, Loader2, Sparkles, CornerDownLeft, FolderKanban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore, type Employee } from '@/store/useAppStore';
 
 const globalNavItems: { name: string; path: string; icon: typeof Home; minLevel?: Employee['level'] }[] = [
   { name: '홈', path: '/dashboard', icon: Home },
+  { name: '프로젝트', path: '/projects', icon: FolderKanban },
   { name: '회의분석', path: '/meetings', icon: Mic2 },
   { name: '업무관리', path: '/pipeline', icon: Briefcase },
   { name: '업무보드', path: '/tasks', icon: ListChecks },

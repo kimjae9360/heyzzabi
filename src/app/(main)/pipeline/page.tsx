@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { GitBranch, CheckCircle2, AlertCircle, User, ChevronRight, Activity, FileSignature, BrainCircuit, X, AlertTriangle, Mic, Download } from 'lucide-react';
 import Link from 'next/link';
@@ -57,7 +57,7 @@ function DroppableColumn({ id, children }: { id: string; children: React.ReactNo
 }
 
 export default function Pipeline() {
-  const { meetings = [], tasks = [], employees = [], generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
+  const { meetings = [], tasks = [], employees = [], projects = [], fetchProjects, generateProposal, downloadPPT, approveProposalAndExtractTasks, approveDistribution, rejectProposal, rejectDistribution, reportDelay, reallocateTask, updateTaskStatus } = useAppStore();
 
   const [rejectModal, setRejectModal] = useState<RejectModal | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -66,14 +66,25 @@ export default function Pipeline() {
   const [delayReason, setDelayReason] = useState('');
   const [dropConfirm, setDropConfirm] = useState<DropConfirm | null>(null);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
   const toggleExpanded = (id: string) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const meetingsRaw = meetings.filter(m => !m.hasProposal);
-  const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted);
-  const pendingTasks = tasks.filter(t => t.status === 'pending-distribution');
-  const activeTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'delayed');
-  const shippedTasks = tasks.filter(t => t.status === 'shipped');
+  useEffect(() => { fetchProjects?.(); }, [fetchProjects]);
+
+  // /projects 카드에서 "업무관리에서 보기"로 넘어올 때 ?project=<id> 쿼리로 초기 필터를 지정한다.
+  useEffect(() => {
+    const projectParam = new URLSearchParams(window.location.search).get('project');
+    if (projectParam) setSelectedProjectId(projectParam);
+  }, []);
+
+  const inProject = <T extends { projectId?: string }>(item: T) => selectedProjectId === 'all' || item.projectId === selectedProjectId;
+
+  const meetingsRaw = meetings.filter(m => !m.hasProposal && inProject(m));
+  const meetingsWaiting = meetings.filter(m => m.hasProposal && !m.isTasksExtracted && inProject(m));
+  const pendingTasks = tasks.filter(t => t.status === 'pending-distribution' && inProject(t));
+  const activeTasks = tasks.filter(t => (t.status === 'in-progress' || t.status === 'delayed') && inProject(t));
+  const shippedTasks = tasks.filter(t => t.status === 'shipped' && inProject(t));
 
   const handleGenerateProposal = (id: string) => {
     generateProposal(id);
@@ -311,6 +322,16 @@ export default function Pipeline() {
           <p className="text-gray-500 text-xs mt-0.5">회의 요약 → 기획서 검토 → 배분 승인/반려 → 진행 추적 → 완료</p>
         </div>
         <div className="flex items-center gap-3">
+          {projects.length > 1 && (
+            <select
+              value={selectedProjectId}
+              onChange={e => setSelectedProjectId(e.target.value)}
+              className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 cursor-pointer"
+            >
+              <option value="all">전체 프로젝트</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          )}
           <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
             <Activity className="w-3.5 h-3.5 animate-pulse" /> AI Engine Active
           </div>

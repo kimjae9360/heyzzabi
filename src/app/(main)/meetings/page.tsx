@@ -9,7 +9,7 @@ import { useAppStore } from '@/store/useAppStore';
 type MeetingTab = 'raw' | 'analysis' | 'proposal';
 
 export default function Meetings() {
-  const { meetings = [], generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
+  const { meetings = [], projects = [], fetchProjects, generateProposal = () => {}, editProposal = () => {}, approveProposalAndExtractTasks = () => {}, rejectProposal = () => {}, addMeeting = () => {}, deleteMeeting = () => {}, downloadPPT = async () => {} } = useAppStore();
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<MeetingTab>('raw');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -21,9 +21,13 @@ export default function Meetings() {
   const [rejectReason, setRejectReason] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [newProjectId, setNewProjectId] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
+
+  useEffect(() => { fetchProjects?.(); }, [fetchProjects]);
+  useEffect(() => { if (!newProjectId && projects.length > 0) setNewProjectId(projects[0].id); }, [projects, newProjectId]);
 
   const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
   const filteredMeetings = meetings.filter(m =>
@@ -73,7 +77,7 @@ export default function Meetings() {
   const handleAddMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newContent) return;
-    await addMeeting({ title: newTitle, content: newContent });
+    await addMeeting({ title: newTitle, content: newContent, projectId: newProjectId || undefined });
     setNewTitle(''); setNewContent(''); setUploadedFileName(''); setExtractError('');
     setShowNewForm(false);
   };
@@ -156,6 +160,14 @@ export default function Meetings() {
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">회의 제목 *</label>
                   <input autoFocus required value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-gray-50 focus:bg-white transition-all" placeholder="예: [주간회의] 8월 2주차 스프린트 플래닝" />
                 </div>
+                {projects.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">프로젝트</label>
+                    <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">파일에서 불러오기 <span className="text-gray-400 font-normal">(음성 mp3/wav/m4a, 문서 txt/md/docx/pdf)</span></label>
                   <label className={cn(

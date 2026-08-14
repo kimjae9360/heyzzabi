@@ -1,4 +1,4 @@
-import type { User, Meeting, Planning, Task, Notification } from '@prisma/client';
+import type { User, Meeting, Planning, Task, Notification, Project } from '@prisma/client';
 
 function parseJsonArray(value: string | null): string[] {
   if (!value) return [];
@@ -45,6 +45,19 @@ export function toEmployeeDTO(user: User) {
   };
 }
 
+export function toProjectDTO(project: Project & { _count?: { tasks: number; meetings: number } }) {
+  return {
+    id: project.project_id,
+    title: project.title,
+    description: project.description ?? undefined,
+    status: project.status,
+    priority: project.priority,
+    createdAt: project.created_at.toISOString(),
+    taskCount: project._count?.tasks,
+    meetingCount: project._count?.meetings,
+  };
+}
+
 const MEETING_STATUS_TO_UI: Record<string, string> = { DRAFT: 'DRAFT', REVIEW: 'REVIEW', CONFIRMED: 'CONFIRMED' };
 
 export function toMeetingDTO(meeting: Meeting & { plannings?: Planning[] }) {
@@ -73,6 +86,7 @@ export function toMeetingDTO(meeting: Meeting & { plannings?: Planning[] }) {
     isTasksExtracted: planning?.status === 'APPROVED' || planning?.status === 'COMPLETED',
     isProposalRejected: planning?.status === 'REJECTED',
     proposalRejectedReason: planning?.rejected_reason ?? undefined,
+    projectId: meeting.project_id ?? undefined,
   };
 }
 
@@ -107,6 +121,7 @@ export function toTaskDTO(task: Task & { planning?: Planning | null; meeting?: M
     dueDateIso: task.end_date ? task.end_date.toISOString() : undefined,
     planningId: task.planning_id ?? undefined,
     meetingId: task.meeting_id ?? undefined,
+    projectId: task.project_id ?? undefined,
   };
 }
 
