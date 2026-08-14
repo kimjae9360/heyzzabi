@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { UserPlus, Users, Search, Trash2, Pencil, X, Save, Mail, Phone, BadgeCheck, ShieldAlert, CircleSlash, Moon } from 'lucide-react';
 import { useAppStore, type Employee, type EmployeeStatus } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
-import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN, splitEmail } from '@/lib/employeeOptions';
+import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN, SKILL_SUGGESTIONS, CERT_SUGGESTIONS, splitEmail } from '@/lib/employeeOptions';
+import TagAutocomplete from '@/components/TagAutocomplete';
 
 type FilterStatus = 'all' | EmployeeStatus;
 
@@ -25,18 +26,27 @@ interface FormState {
   level: Employee['level'];
   status: EmployeeStatus;
   hireDate: string;
-  skillsStr: string;
-  certsStr: string;
-  projectsStr: string;
+  skills: string[];
+  certifications: string[];
+  pastProjects: string[];
 }
 
 const EMPTY_FORM: FormState = {
   name: '', emailLocal: '', phone: '', department: '', position: '', role: '',
-  level: 'member', status: 'ACTIVE', hireDate: '', skillsStr: '', certsStr: '', projectsStr: '',
+  level: 'member', status: 'ACTIVE', hireDate: '', skills: [], certifications: [], pastProjects: [],
 };
 
 export default function Employees() {
-  const { employees = [], addEmployee, updateEmployee, removeEmployee } = useAppStore();
+  const { employees = [], projects = [], fetchProjects, addEmployee, updateEmployee, removeEmployee } = useAppStore();
+
+  useEffect(() => { fetchProjects?.(); }, [fetchProjects]);
+
+  // 주요 프로젝트 후보: 실제 등록된 프로젝트명 + 다른 직원들이 이미 입력해둔 과거 프로젝트명(중복 제거)
+  const projectSuggestions = useMemo(() => {
+    const fromProjects = projects.map(p => p.title);
+    const fromHistory = employees.flatMap(e => e.pastProjects || []);
+    return Array.from(new Set([...fromProjects, ...fromHistory])).sort();
+  }, [projects, employees]);
 
   const [query, setQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -87,9 +97,9 @@ export default function Employees() {
       level: emp.level,
       status: emp.status,
       hireDate: emp.hireDate || '',
-      skillsStr: (emp.skills || []).join(', '),
-      certsStr: (emp.certifications || []).join(', '),
-      projectsStr: (emp.pastProjects || []).join(', '),
+      skills: emp.skills || [],
+      certifications: emp.certifications || [],
+      pastProjects: emp.pastProjects || [],
     });
     setModalOpen(true);
   };
@@ -108,9 +118,9 @@ export default function Employees() {
       level: form.level,
       status: form.status,
       hireDate: form.hireDate || undefined,
-      skills: form.skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-      certifications: form.certsStr.split(',').map(s => s.trim()).filter(Boolean),
-      pastProjects: form.projectsStr.split(',').map(s => s.trim()).filter(Boolean),
+      skills: form.skills,
+      certifications: form.certifications,
+      pastProjects: form.pastProjects,
     };
 
     if (editingId) {
@@ -216,19 +226,34 @@ export default function Employees() {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">기술 스택 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                <input value={form.skillsStr} onChange={e => setForm(f => ({ ...f, skillsStr: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="React, TypeScript" />
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">기술 스택 <span className="font-normal text-gray-400">(입력해서 검색하거나 목록 아이콘으로 찾아보기)</span></label>
+                <TagAutocomplete
+                  value={form.skills}
+                  onChange={skills => setForm(f => ({ ...f, skills }))}
+                  suggestions={SKILL_SUGGESTIONS}
+                  placeholder="React, TypeScript..."
+                  accent="blue"
+                />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">자격증 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                <input value={form.certsStr} onChange={e => setForm(f => ({ ...f, certsStr: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="정보처리기사" />
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">자격증 <span className="font-normal text-gray-400">(입력해서 검색하거나 목록 아이콘으로 찾아보기)</span></label>
+                <TagAutocomplete
+                  value={form.certifications}
+                  onChange={certifications => setForm(f => ({ ...f, certifications }))}
+                  suggestions={CERT_SUGGESTIONS}
+                  placeholder="정보처리기사..."
+                  accent="violet"
+                />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">주요 프로젝트 <span className="font-normal text-gray-400">(쉼표 구분)</span></label>
-                <textarea value={form.projectsStr} onChange={e => setForm(f => ({ ...f, projectsStr: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm h-16 resize-none focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white" placeholder="API 서버 구축" />
+                <label className="block text-[10px] font-bold text-gray-600 mb-1">주요 프로젝트 <span className="font-normal text-gray-400">(등록된 프로젝트/과거 이력에서 선택하거나 직접 입력)</span></label>
+                <TagAutocomplete
+                  value={form.pastProjects}
+                  onChange={pastProjects => setForm(f => ({ ...f, pastProjects }))}
+                  suggestions={projectSuggestions}
+                  placeholder="프로젝트명 입력..."
+                  accent="emerald"
+                />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
