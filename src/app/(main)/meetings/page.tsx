@@ -297,20 +297,9 @@ export default function Meetings() {
               {/* Tab: 회의록 (Raw) */}
               {activeTab === 'raw' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 flex items-center gap-2 text-sm font-bold text-gray-600">
-                    <Mic className="w-4 h-4 text-gray-400" /> 회의 원문
-                  </div>
-                  <div className="p-5 space-y-1">
-                    {selectedMeeting.summary.map((line, i) => (
-                      <div key={i} className="flex gap-3 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 rounded-lg px-2 transition-colors">
-                        <span className="text-gray-300 font-bold text-xs select-none mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                        <span className="text-sm text-gray-800 leading-relaxed">{line}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Generate CTA */}
+                  {/* Generate CTA - 목록이 길면(안건 수백 개) 끝까지 스크롤해야 보이던 문제로 상단에 배치 */}
                   {!selectedMeeting.hasProposal && (
-                    <div className="border-t border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 flex items-center justify-between">
+                    <div className="border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-bold text-indigo-900">AI 기획서 자동 생성</p>
                         <p className="text-xs text-indigo-600 mt-0.5">안건·결정사항·액션아이템을 추출하고 구조화된 기획서를 작성합니다.</p>
@@ -322,12 +311,28 @@ export default function Meetings() {
                       </button>
                     </div>
                   )}
+                  <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 flex items-center gap-2 text-sm font-bold text-gray-600">
+                    <Mic className="w-4 h-4 text-gray-400" /> 회의 원문
+                  </div>
+                  <div className="p-5 space-y-1">
+                    {selectedMeeting.summary.map((line, i) => (
+                      <div key={i} className="flex gap-3 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 rounded-lg px-2 transition-colors">
+                        <span className="text-gray-300 font-bold text-xs select-none mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="text-sm text-gray-800 leading-relaxed">{line}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {/* Tab: AI 분석 (Structured) */}
               {activeTab === 'analysis' && selectedMeeting.analysis && (
                 <div className="space-y-3">
+                  <div className="text-center">
+                    <button onClick={() => setActiveTab('proposal')} className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow transition-all">
+                      기획서 초안 확인하기 <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                   {[
                     { label: '📋 주요 안건 (Agenda)', items: selectedMeeting.analysis.agenda, color: 'blue' },
                     { label: '✅ 결정사항 (Decisions)', items: selectedMeeting.analysis.decisions, color: 'emerald' },
@@ -359,11 +364,6 @@ export default function Meetings() {
                       </div>
                     </div>
                   ))}
-                  <div className="text-center">
-                    <button onClick={() => setActiveTab('proposal')} className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow transition-all">
-                      기획서 초안 확인하기 <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -382,26 +382,10 @@ export default function Meetings() {
                       </button>
                     )}
                   </div>
-                  <div className="p-5">
-                    {editingProposal ? (
-                      <div className="space-y-3">
-                        <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)}
-                          className="w-full h-72 p-4 border border-indigo-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-400 outline-none bg-white resize-none" />
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setEditingProposal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-bold flex items-center gap-1"><X className="w-3.5 h-3.5" /> 취소</button>
-                          <button onClick={handleSaveEdit} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 flex items-center gap-1 shadow-sm"><Save className="w-3.5 h-3.5" /> 저장</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 bg-gray-50 rounded-xl p-5 border border-gray-100 font-medium">
-                        {selectedMeeting.proposalContent}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Approve / Reject Actions */}
+                  {/* Approve / Reject Actions - 기획서가 길면 끝까지 스크롤해야 보이던 문제로 상단에 배치 */}
                   {!selectedMeeting.isTasksExtracted && !editingProposal && (
-                    <div className="border-t border-gray-100 p-5 flex items-center justify-between bg-gray-50">
+                    <div className="border-b border-gray-100 p-5 flex items-center justify-between bg-gray-50">
                       <p className="text-xs text-gray-500 font-medium">검토 완료 후 파이프라인으로 전달하거나, 반려 사유를 작성해 주세요.</p>
                       <div className="flex gap-2 ml-4 shrink-0">
                         <button onClick={() => setShowRejectModal(true)}
@@ -418,7 +402,7 @@ export default function Meetings() {
                     </div>
                   )}
                   {selectedMeeting.isTasksExtracted && (
-                    <div className="border-t border-emerald-100 p-5 bg-emerald-50 flex items-center justify-between">
+                    <div className="border-b border-emerald-100 p-5 bg-emerald-50 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
                         <CheckSquare className="w-5 h-5" /> 기획서 확정 — 파이프라인으로 전달되었습니다.
                       </div>
@@ -427,6 +411,23 @@ export default function Meetings() {
                       </Link>
                     </div>
                   )}
+
+                  <div className="p-5">
+                    {editingProposal ? (
+                      <div className="space-y-3">
+                        <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)}
+                          className="w-full h-72 p-4 border border-indigo-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-400 outline-none bg-white resize-none" />
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => setEditingProposal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-bold flex items-center gap-1"><X className="w-3.5 h-3.5" /> 취소</button>
+                          <button onClick={handleSaveEdit} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 flex items-center gap-1 shadow-sm"><Save className="w-3.5 h-3.5" /> 저장</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-7 bg-gray-50 rounded-xl p-5 border border-gray-100 font-medium">
+                        {selectedMeeting.proposalContent}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
