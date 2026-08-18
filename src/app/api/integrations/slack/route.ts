@@ -25,22 +25,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '관리자(PM)만 연동할 수 있습니다.' }, { status: 403 });
     }
 
-    const { webhookUrl } = await request.json();
-    if (!webhookUrl || !webhookUrl.startsWith('https://hooks.slack.com/')) {
-      return NextResponse.json({ error: '유효한 Slack Webhook URL을 입력해주세요.' }, { status: 400 });
+    const { botToken, channelId } = await request.json();
+    if (!botToken || !botToken.startsWith('xoxb-') || !channelId) {
+      return NextResponse.json({ error: '유효한 Bot Token과 채널 ID를 입력해주세요.' }, { status: 400 });
     }
+
+    const payload = JSON.stringify({ botToken, channelId });
 
     await prisma.integrationConnection.upsert({
       where: { provider: 'slack' },
       update: {
-        access_token: webhookUrl,
+        access_token: payload,
         connected_by: user.user_id,
         connected_at: new Date(),
       },
       create: {
         provider: 'slack',
-        external_login: 'Webhook',
-        access_token: webhookUrl,
+        external_login: 'WebAPI',
+        access_token: payload,
         connected_by: user.user_id,
       },
     });

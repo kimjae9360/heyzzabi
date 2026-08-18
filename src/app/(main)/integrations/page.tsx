@@ -24,7 +24,8 @@ export default function Integrations() {
 
   const [slackConnected, setSlackConnected] = useState(false);
   const [showSlackModal, setShowSlackModal] = useState(false);
-  const [slackWebhookInput, setSlackWebhookInput] = useState('');
+  const [slackBotTokenInput, setSlackBotTokenInput] = useState('');
+  const [slackChannelIdInput, setSlackChannelIdInput] = useState('');
   const [slackLinking, setSlackLinking] = useState(false);
   const [slackLinkError, setSlackLinkError] = useState('');
 
@@ -114,8 +115,8 @@ export default function Integrations() {
 
   const handleSlackLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!slackWebhookInput.trim()) {
-      setSlackLinkError('Webhook URL을 입력해 주세요.');
+    if (!slackBotTokenInput.trim() || !slackChannelIdInput.trim()) {
+      setSlackLinkError('Bot Token과 채널 ID를 모두 입력해 주세요.');
       return;
     }
     setSlackLinking(true);
@@ -124,14 +125,15 @@ export default function Integrations() {
       const res = await fetch(`/api/integrations/slack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhookUrl: slackWebhookInput.trim() }),
+        body: JSON.stringify({ botToken: slackBotTokenInput.trim(), channelId: slackChannelIdInput.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Slack 연동에 실패했습니다.');
       
       setToast('Slack이 성공적으로 연동되었습니다.', 'success');
       setShowSlackModal(false);
-      setSlackWebhookInput('');
+      setSlackBotTokenInput('');
+      setSlackChannelIdInput('');
       setSlackConnected(true);
     } catch (err) {
       setSlackLinkError(err instanceof Error ? err.message : 'Slack 연동에 실패했습니다.');
@@ -232,21 +234,31 @@ export default function Integrations() {
             {isAdmin ? (
               <form onSubmit={handleSlackLink} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Webhook URL *</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Bot User OAuth Token *</label>
                   <input 
-                    value={slackWebhookInput} 
-                    onChange={e => setSlackWebhookInput(e.target.value)} 
-                    placeholder="https://hooks.slack.com/services/..." 
+                    value={slackBotTokenInput} 
+                    onChange={e => setSlackBotTokenInput(e.target.value)} 
+                    placeholder="xoxb-..." 
                     className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 bg-gray-50 focus:bg-white transition-all" 
                   />
-                  <p className="text-[10px] text-gray-400 mt-1.5">Slack에서 생성한 Incoming Webhook URL을 입력하세요.</p>
+                  <p className="text-[10px] text-gray-400 mt-1.5">Slack App 설정 페이지에서 발급받은 봇 토큰(xoxb-)을 입력하세요.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">알림 채널 ID *</label>
+                  <input 
+                    value={slackChannelIdInput} 
+                    onChange={e => setSlackChannelIdInput(e.target.value)} 
+                    placeholder="C0123456789" 
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 bg-gray-50 focus:bg-white transition-all" 
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1.5">메시지를 전송할 채널의 ID를 입력하세요. (채널 우클릭 {'>'} 링크 복사 시 끝부분)</p>
                 </div>
                 
                 {slackLinkError && <p className="text-[11px] text-red-600 mt-2">{slackLinkError}</p>}
                 
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={() => setShowSlackModal(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
-                  <button type="submit" disabled={slackLinking || !slackWebhookInput.trim()} className="px-5 py-2.5 text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-60">
+                  <button type="submit" disabled={slackLinking || !slackBotTokenInput.trim() || !slackChannelIdInput.trim()} className="px-5 py-2.5 text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-60">
                     {slackLinking ? '연동 중...' : '연동'}
                   </button>
                 </div>
