@@ -73,6 +73,7 @@ export interface Task {
   difficulty?: 'High' | 'Medium' | 'Low';
   difficultyReason?: string;
   status: TaskUiStatus;
+  originalStatus: string;
   assigneeId?: string;
   progress?: number;
   delayReason?: string;
@@ -98,7 +99,7 @@ export interface Notification {
 
 const DB_TASK_STATUS_TO_UI: Record<string, TaskUiStatus | null> = {
   PENDING_DISTRIBUTION: 'pending-distribution',
-  TODO: 'pending-distribution',
+  TODO: 'in-progress',
   IN_PROGRESS: 'in-progress',
   REVIEW: 'in-progress',
   DELAYED: 'delayed',
@@ -207,7 +208,7 @@ function mapTask(t: TaskApiDTO): Task | null {
   const status = DB_TASK_STATUS_TO_UI[t.status];
   if (!status) return null;
   return {
-    id: t.id, title: t.title, source: t.source, status,
+    id: t.id, title: t.title, source: t.source, status, originalStatus: t.status,
     assigneeId: t.assigneeId, progress: t.progress, estimatedHours: t.estimatedHours,
     difficulty: t.difficulty as Task['difficulty'], difficultyReason: t.difficultyReason, rejectedReason: t.rejectedReason,
     delayReason: t.delayReason, completedAt: t.completedAt, completedAtIso: t.completedAtIso, createdAtIso: t.createdAtIso,

@@ -699,18 +699,19 @@ export default function Pipeline() {
             {activeTasks.map((t) => {
               const assignee = employees.find(e => e.id === t.assigneeId);
               const isDelayed = t.status === 'delayed';
-              const isOverdue = !isDelayed && t.dueDate && new Date(t.dueDate).getTime() < Date.now();
+              const isTodo = t.originalStatus === 'TODO';
+              const isOverdue = !isDelayed && !isTodo && t.dueDate && new Date(t.dueDate).getTime() < Date.now();
               return (
                 <DraggableCard key={t.id} id={t.id}>
                 <div className={cn(
                   "bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-y-gray-100 border-r-gray-100 hover:shadow-md transition-all",
-                  isDelayed ? "border-l-red-500 bg-red-50/30" : isOverdue ? "border-l-amber-500 bg-amber-50/30" : "border-l-emerald-500"
+                  isDelayed ? "border-l-red-500 bg-red-50/30" : isOverdue ? "border-l-amber-500 bg-amber-50/30" : isTodo ? "border-l-blue-500" : "border-l-emerald-500"
                 )}>
                   <div className="flex items-center justify-between mb-2">
                     <span className={cn("text-[11px] font-black px-2 py-0.5 rounded-full",
-                      isDelayed ? "bg-red-100 text-red-700" : isOverdue ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                      isDelayed ? "bg-red-100 text-red-700" : isOverdue ? "bg-amber-100 text-amber-700" : isTodo ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
                     )}>
-                      {isDelayed ? '⚠ 지연 감지됨' : isOverdue ? '⏰ SLA 초과 (자동 감지)' : '진행 중'}
+                      {isDelayed ? '⚠ 지연 감지됨' : isOverdue ? '⏰ SLA 초과 (자동 감지)' : isTodo ? '💬 Slack 수락 대기중' : '진행 중'}
                     </span>
                     {assignee && (
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
@@ -731,12 +732,12 @@ export default function Pipeline() {
                   ) : (
                     <div className="mb-3">
                       <div className="flex justify-between text-[11px] font-bold text-gray-500 mb-1">
-                        <span>진행률</span><span>{t.progress || 10}%</span>
+                        <span>진행률</span><span>{isTodo ? 0 : (t.progress || 10)}%</span>
                       </div>
                       <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
-                        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${t.progress || 10}%` }} />
+                        <div className={cn("h-full rounded-full transition-all", isTodo ? "bg-blue-400" : "bg-emerald-500")} style={{ width: `${isTodo ? 0 : (t.progress || 10)}%` }} />
                       </div>
-                      {t.dueDate && (
+                      {t.dueDate && !isTodo && (
                         <div className={cn("text-[11px] font-bold mt-1.5", isOverdue ? "text-amber-700" : "text-gray-400")}>
                           {formatDueLabel(t.dueDate)}
                         </div>
