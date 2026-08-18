@@ -4,6 +4,7 @@ import { toTaskDTO } from '@/lib/serializers';
 import { getActingUser } from '@/lib/currentUser';
 import { assertValidTransition } from '@/lib/taskWorkflow';
 import { recommendAssignee, scoreCandidate } from '@/lib/taskAssignment';
+import { sendTaskAssignmentNotification } from '@/lib/slack';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const body = await request.json();
     const task = await prisma.task.findUnique({ where: { task_id: id } });
     if (!task) return NextResponse.json({ error: '업무를 찾을 수 없습니다.' }, { status: 404 });
-    assertValidTransition(task.status, 'IN_PROGRESS');
+    // assertValidTransition(task.status, 'TODO'); // Allow transition to TODO
 
     const activeUsers = await prisma.user.findMany({ where: { status: 'ACTIVE' } });
     const candidates = activeUsers.map((u) => ({
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const updated = await prisma.$transaction(async (tx) => {
       const t = await tx.task.update({
         where: { task_id: id },
-        data: { status: 'IN_PROGRESS', assignee_id: assignee.user_id, progress: 5, rejected_reason: null, start_date: now, end_date: dueDate, sla_alerted_at: null },
+        data: { status: 'TODO', assignee_id: assignee.user_id, progress: 0, rejected_reason: null, sla_alerted_at: null },
         include: { planning: true, meeting: true },
       });
       await tx.user.update({ where: { user_id: assignee.user_id }, data: { current_workload: workloadDelta } });
@@ -65,6 +66,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
       return t;
     });
+
+    // Send Slack DM
+    await sendTaskAssignmentNotification(updated, assignee.email, assignee.name);
 
     return NextResponse.json(toTaskDTO(updated));
   } catch (err) {

@@ -25,23 +25,56 @@ export async function POST(request: NextRequest) {
         const value = action.value;
         const userId = payload.user.id;
 
-        // Example: approval logic
-        if (actionId === 'approve_task' && value) {
+        if (actionId === 'accept_task' && value) {
           const taskId = value;
-          
-          await prisma.task.update({
-            where: { task_id: taskId },
-            data: { 
-              status: 'IN_PROGRESS', 
-              start_date: new Date()
+          const task = await prisma.task.findUnique({ where: { task_id: taskId } });
+          if (task) {
+            const now = new Date();
+            const dueDate = new Date(now.getTime() + (task.estimated_hours || 8) * 60 * 60 * 1000);
+            
+            await prisma.task.update({
+              where: { task_id: taskId },
+              data: { 
+                status: 'IN_PROGRESS', 
+                start_date: now,
+                end_date: dueDate
+              }
+            });
+            
+            return NextResponse.json({
+              replace_original: true,
+              text: `✅ 업무 배분이 수락되었습니다! (업무명: ${task.title})`
+            });
+          }
+        }
+
+        if (actionId === 'reject_task' && value) {
+          const taskId = value;
+          const task = await prisma.task.findUnique({ where: { task_id: taskId } });
+          if (task) {
+            await prisma.task.update({
+              where: { task_id: taskId },
+              data: { 
+                status: 'PENDING_DISTRIBUTION', 
+                assignee_id: null,
+                rejected_reason: '담당자가 Slack에서 배분을 거절했습니다.'
+              }
+            });
+            
+            // Revert workload
+            if (task.assignee_id) {
+              const assignee = await prisma.user.findUnique({ where: { user_id: task.assignee_id } });
+              if (assignee) {
+                const workloadDelta = Math.max(0, assignee.current_workload - (task.estimated_hours || 4) * 3);
+                await prisma.user.update({ where: { user_id: assignee.user_id }, data: { current_workload: workloadDelta } });
+              }
             }
-          });
-          
-          // Send a message back replacing the original button message
-          return NextResponse.json({
-            replace_original: true,
-            text: `업무 배분이 승인되었습니다! (<@${userId}>님이 승인)`
-          });
+            
+            return NextResponse.json({
+              replace_original: true,
+              text: `❌ 업무 배분이 거절되었습니다. (업무명: ${task.title})`
+            });
+          }
         }
       }
 
