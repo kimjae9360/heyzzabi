@@ -159,6 +159,11 @@ model Task {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
+  // GitHub PR 메타데이터
+  github_pr_number Int?
+  github_pr_url    String?
+  github_pr_state  String?
+
   // Relations
   assignee_id String?
   assignee    User?     @relation(fields: [assignee_id], references: [user_id])

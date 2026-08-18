@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Briefcase, Search, CheckCircle2, AlertCircle, Clock, AlertTriangle, ChevronUp, ChevronDown, Sparkles, Settings } from 'lucide-react';
+import { Briefcase, Search, CheckCircle2, AlertCircle, Clock, AlertTriangle, ChevronUp, ChevronDown, Sparkles, Settings, RefreshCw, GitPullRequest } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 
@@ -10,7 +10,7 @@ type SortKey = 'title' | 'status' | 'estimatedHours' | 'difficulty';
 type FilterStatus = 'all' | 'pending-distribution' | 'in-progress' | 'delayed' | 'shipped';
 
 export default function Tasks() {
-  const { tasks, employees, updateTaskProgress, splitTaskByAi, projects = [], fetchProjects } = useAppStore();
+  const { tasks, employees, updateTaskProgress, splitTaskByAi, projects = [], fetchProjects, syncGithubPRs, loading } = useAppStore();
   const [query, setQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
@@ -100,6 +100,14 @@ export default function Tasks() {
                 </Link>
               )}
             </div>
+            <button
+              onClick={syncGithubPRs}
+              disabled={loading}
+              className="flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg font-bold transition-colors shadow-sm text-sm border border-blue-200 disabled:opacity-60"
+            >
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+              동기화
+            </button>
             <div className="relative w-72">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -199,6 +207,27 @@ export default function Tasks() {
 
                     {/* Task Info */}
                     <div className="col-span-4">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          TASK-{t.id.split('-')[0]}
+                        </span>
+                        {t.githubPrNumber && (
+                          <a
+                            href={t.githubPrUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors hover:bg-opacity-80 text-white"
+                            style={{
+                              backgroundColor: t.githubPrState === 'merged' ? '#8957e5' : t.githubPrState === 'open' ? '#2da44e' : '#cf222e',
+                              borderColor: t.githubPrState === 'merged' ? '#8957e5' : t.githubPrState === 'open' ? '#2da44e' : '#cf222e'
+                            }}
+                            title={`PR #${t.githubPrNumber} (${t.githubPrState})`}
+                          >
+                            <GitPullRequest className="w-3 h-3" />
+                            #{t.githubPrNumber}
+                          </a>
+                        )}
+                      </div>
                       <div className={cn("font-bold text-sm", isShipped ? "text-gray-400 line-through" : "text-gray-900")}>
                         {isDelayed && <AlertTriangle className="w-3 h-3 inline mr-1 text-red-500" />}
                         {t.title}

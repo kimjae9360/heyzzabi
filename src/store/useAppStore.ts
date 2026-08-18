@@ -82,6 +82,9 @@ export interface Task {
   createdAtIso: string;
   dueDate?: string;
   projectId?: string;
+  githubPrNumber?: number;
+  githubPrUrl?: string;
+  githubPrState?: string;
 }
 
 export interface Notification {
@@ -135,6 +138,7 @@ interface AppState {
   toast: { message: string; type: 'success' | 'info' | 'warning' | 'error' } | null;
 
   fetchData: () => Promise<void>;
+  syncGithubPRs: () => Promise<void>;
 
   // Projects
   fetchProjects: () => Promise<void>;
@@ -197,6 +201,7 @@ interface TaskApiDTO {
   assigneeId?: string; progress: number; estimatedHours?: number; difficulty?: string; difficultyReason?: string;
   rejectedReason?: string; delayReason?: string; completedAt?: string; completedAtIso?: string; createdAtIso: string; dueDateIso?: string;
   projectId?: string;
+  github_pr_number?: number; github_pr_url?: string; github_pr_state?: string;
 }
 function mapTask(t: TaskApiDTO): Task | null {
   const status = DB_TASK_STATUS_TO_UI[t.status];
@@ -207,6 +212,7 @@ function mapTask(t: TaskApiDTO): Task | null {
     difficulty: t.difficulty as Task['difficulty'], difficultyReason: t.difficultyReason, rejectedReason: t.rejectedReason,
     delayReason: t.delayReason, completedAt: t.completedAt, completedAtIso: t.completedAtIso, createdAtIso: t.createdAtIso,
     dueDate: t.dueDateIso, projectId: t.projectId,
+    githubPrNumber: t.github_pr_number, githubPrUrl: t.github_pr_url, githubPrState: t.github_pr_state,
   };
 }
 
@@ -264,6 +270,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     } catch (err) {
       set({ loading: false, toast: { message: err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.', type: 'error' } });
+    }
+  },
+
+  syncGithubPRs: async () => {
+    set({ loading: true });
+    try {
+      const res = await apiFetch<any>('/api/integrations/github/sync', { method: 'POST' });
+      if (res.checkedProjects === 0) {
+        set({ toast: { message: 'GitHub가 연동된 프로젝트가 없습니다.', type: 'warning' } });
+      } else if (res.completed.length > 0) {
+        const first = res.completed[0];
+        const rest = res.completed.length - 1;
+        set({ toast: { message: `PR #${first.prNumber} 병합 확인 → "${first.taskTitle}" 완료 처리${rest > 0 ? ` 외 ${rest}건` : ''}`, type: 'success' } });
+      } else if (res.errors && res.errors.length > 0) {
+        set({ toast: { message: res.errors[0], type: 'error' } });
+      } else {
+        set({ toast: { message: '동기화 완료: 새로 완료된 업무가 없습니다.', type: 'info' } });
+      }
+      await get().fetchData();
+    } catch (err) {
+      set({ toast: { message: err instanceof Error ? err.message : 'GitHub 동기화에 실패했습니다.', type: 'error' } });
+    } finally {
+      set({ loading: false });
     }
   },
 

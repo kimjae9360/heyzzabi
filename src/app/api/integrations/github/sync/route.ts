@@ -18,30 +18,47 @@ export async function POST(request: NextRequest) {
     for (const project of projects) {
       if (!project.github_owner || !project.github_repo) continue;
 
-      let mergedPRs;
+      let prs;
       try {
         const activity = await fetchGithubActivity(project.github_owner, project.github_repo, project.github_token);
-        mergedPRs = activity.pullRequests.filter((pr) => pr.state === 'merged');
+        prs = activity.pullRequests;
       } catch (err) {
         errors.push(`${project.title}: ${err instanceof Error ? err.message : 'GitHub 조회에 실패했습니다.'}`);
         continue;
       }
-      if (mergedPRs.length === 0) continue;
+      if (prs.length === 0) continue;
 
-      const inProgressTasks = await prisma.task.findMany({
-        where: { project_id: project.project_id, status: 'IN_PROGRESS' },
+      const activeTasks = await prisma.task.findMany({
+        where: {
+          project_id: project.project_id,
+          status: { in: ['IN_PROGRESS', 'PENDING_DISTRIBUTION'] },
+        },
       });
 
-      for (const task of inProgressTasks) {
-        const normalizedTitle = task.title.trim().toLowerCase();
-        const matchedPr = mergedPRs.find((pr) => pr.title.toLowerCase().includes(normalizedTitle));
+      for (const task of activeTasks) {
+        const shortId = task.task_id.split('-')[0].toUpperCase();
+        const pattern = new RegExp(`TASK-${shortId}`, 'i');
+        
+        const matchedPr = prs.find((pr) => pattern.test(pr.title) || pattern.test(pr.body));
         if (!matchedPr) continue;
+
+        const updateData: any = {
+          github_pr_number: matchedPr.number,
+          github_pr_url: matchedPr.url,
+          github_pr_state: matchedPr.state,
+        };
+
+        if (matchedPr.state === 'merged') {
+          updateData.status = 'DONE';
+          updateData.completed_at = new Date();
+          updateData.progress = 100;
+          completed.push({ taskTitle: task.title, projectTitle: project.title, prTitle: matchedPr.title, prNumber: matchedPr.number });
+        }
 
         await prisma.task.update({
           where: { task_id: task.task_id },
-          data: { status: 'DONE', completed_at: new Date(), progress: 100 },
+          data: updateData,
         });
-        completed.push({ taskTitle: task.title, projectTitle: project.title, prTitle: matchedPr.title, prNumber: matchedPr.number });
       }
     }
 

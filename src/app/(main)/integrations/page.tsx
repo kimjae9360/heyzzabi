@@ -199,7 +199,7 @@ export default function Integrations() {
               <Zap className="w-5 h-5 text-blue-600" /> GitHub PR 동기화
             </div>
             <p className="text-sm text-blue-800">
-              연동된 프로젝트들의 GitHub 저장소에서 <strong>실제로 병합된 PR</strong>을 조회해, 제목이 일치하는 진행 중인 업무를 완료 처리합니다.
+              PR 제목이나 본문에 업무의 고유 ID(예: <strong>TASK-A1B2C3</strong>)가 포함되어 있으면, PR의 최신 상태를 업무와 연동하고 완료 처리합니다.
             </p>
           </div>
           <button

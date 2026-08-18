@@ -41,6 +41,7 @@ interface GithubCommitApi {
 interface GithubPullApi {
   number: number; title: string; state: string; merged_at: string | null;
   user?: { login?: string } | null; html_url: string; updated_at: string;
+  body?: string | null;
 }
 interface GithubIssueApi {
   number: number; title: string; state: string; user?: { login?: string } | null;
@@ -51,7 +52,7 @@ export interface GithubActivity {
   repoFullName: string;
   repoUrl: string;
   commits: { sha: string; message: string; author: string; date: string; url: string }[];
-  pullRequests: { number: number; title: string; state: string; author: string; url: string; updatedAt: string }[];
+  pullRequests: { number: number; title: string; body: string; state: string; author: string; url: string; updatedAt: string }[];
   issues: { number: number; title: string; state: string; author: string; url: string; updatedAt: string }[];
 }
 
@@ -93,6 +94,7 @@ export async function fetchGithubActivity(owner: string, repo: string, token?: s
     pullRequests: pulls.map((p) => ({
       number: p.number,
       title: p.title,
+      body: p.body || '',
       state: p.merged_at ? 'merged' : p.state,
       author: p.user?.login || '알 수 없음',
       url: p.html_url,
