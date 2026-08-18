@@ -273,10 +273,10 @@ export default function Integrations() {
       <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
         <div className="grid grid-cols-2 gap-4">
           {/* GitHub */}
-          <button onClick={() => setShowLinkModal(true)} className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all group">
-            <div className="flex items-center justify-between">
+          <button onClick={() => setShowLinkModal(true)} className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all group relative">
+            <div className="flex flex-col h-full gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200 shrink-0">
                   <GithubIcon className="w-6 h-6 text-gray-800" />
                 </div>
                 <div>
@@ -284,17 +284,19 @@ export default function Integrations() {
                   <p className="text-sm text-gray-600 mt-0.5">저장소 주소만 입력하면 프로젝트별로 즉시 연동됩니다.</p>
                 </div>
               </div>
-              <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 group-hover:bg-blue-100 transition-colors">
-                연동하기 <ArrowRight className="w-3.5 h-3.5" />
-              </span>
+              <div className="flex justify-end mt-auto">
+                <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 group-hover:bg-blue-100 transition-colors">
+                  연동하기 <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
             </div>
           </button>
 
           {/* Slack */}
-          <div className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 transition-all">
-            <div className="flex items-center justify-between">
+          <div className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 transition-all relative">
+            <div className="flex flex-col h-full gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-purple-50 border-purple-200">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-purple-50 border-purple-200 shrink-0">
                   <MessageSquare className="w-6 h-6 text-purple-700" />
                 </div>
                 <div>
@@ -305,15 +307,17 @@ export default function Integrations() {
                   <p className="text-sm text-gray-600 mt-0.5">배분 승인, 지연 감지, 완료 알림을 전송합니다.</p>
                 </div>
               </div>
-              {slackConnected ? (
-                <button onClick={handleSlackUnlink} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" /> 연동 해제
-                </button>
-              ) : (
-                <button onClick={() => setShowSlackModal(true)} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors">
-                  연동하기 <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              )}
+              <div className="flex justify-end mt-auto">
+                {slackConnected ? (
+                  <button onClick={handleSlackUnlink} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" /> 연동 해제
+                  </button>
+                ) : (
+                  <button onClick={() => setShowSlackModal(true)} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors">
+                    연동하기 <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
