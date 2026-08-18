@@ -323,7 +323,7 @@ export default function Integrations() {
         </div>
 
         {/* GitHub PR 동기화 */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex flex-col gap-4">
           <div>
             <div className="flex items-center gap-2 font-black text-blue-900 mb-1">
               <Zap className="w-5 h-5 text-blue-600" /> GitHub PR 동기화
@@ -332,13 +332,15 @@ export default function Integrations() {
               PR 제목이나 본문에 업무의 고유 ID(예: <strong>TASK-A1B2C3</strong>)가 포함되어 있으면, PR의 최신 상태를 업무와 연동하고 완료 처리합니다.
             </p>
           </div>
-          <button
-            onClick={syncGithub}
-            disabled={syncing}
-            className="shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-60"
-          >
-            {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> 동기화 중...</> : <><Zap className="w-4 h-4" /> 지금 동기화</>}
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={syncGithub}
+              disabled={syncing}
+              className="shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-60"
+            >
+              {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> 동기화 중...</> : <><Zap className="w-4 h-4" /> 지금 동기화</>}
+            </button>
+          </div>
         </div>
       </div>
     </div>

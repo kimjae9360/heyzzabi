@@ -24,6 +24,8 @@ const MIGRATIONS = [
   '20260813090000_add_chat_messages',
   '20260814000000_add_task_sla_alert',
   '20260814010000_add_project_github',
+  '20260814020000_add_task_difficulty_reason',
+  '20260818000000_add_task_github_pr',
 ];
 
 async function main() {
@@ -32,7 +34,14 @@ async function main() {
     const sql = readFileSync(join(__dirname, 'migrations', name, 'migration.sql'), 'utf-8');
     const statements = sql.split(';').map((s) => s.trim()).filter(Boolean);
     for (const stmt of statements) {
-      await client.execute(stmt);
+      try {
+        await client.execute(stmt);
+      } catch (e: any) {
+        // 중복 컬럼/테이블 에러는 이미 적용된 마이그레이션이므로 무시
+        if (!e.message.includes('already exists') && !e.message.includes('duplicate column')) {
+          console.warn(`Warning applying ${name}:`, e.message);
+        }
+      }
     }
     console.log(`applied: ${name}`);
   }
