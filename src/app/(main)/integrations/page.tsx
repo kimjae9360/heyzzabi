@@ -1,15 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, Loader2, X, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link2, GitPullRequest as GithubIcon, MessageSquare, ArrowRight, Zap, Loader2, X, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
-
-const PLANNED_INTEGRATIONS = [
-  { id: 'slack', name: 'Slack', desc: '배분 승인, 지연 감지, 완료 알림을 지정 채널에 전송합니다.', icon: MessageSquare, color: 'purple' },
-  { id: 'jira', name: 'Jira', desc: 'Hey Zzabi 파이프라인 Task를 Jira 이슈로 동기화합니다.', icon: Kanban, color: 'blue' },
-  { id: 'gcal', name: 'Google Calendar', desc: '회의 일정에서 회의록을 생성하고 Action Item을 등록합니다.', icon: Calendar, color: 'green' },
-];
 
 interface SyncResult {
   completed: { taskTitle: string; projectTitle: string; prTitle: string; prNumber: number }[];
@@ -28,7 +22,28 @@ export default function Integrations() {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState('');
 
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [showSlackModal, setShowSlackModal] = useState(false);
+  const [slackWebhookInput, setSlackWebhookInput] = useState('');
+  const [slackLinking, setSlackLinking] = useState(false);
+  const [slackLinkError, setSlackLinkError] = useState('');
+
   const isAdmin = currentUser?.level === 'pm';
+
+  useEffect(() => {
+    const fetchSlackStatus = async () => {
+      try {
+        const res = await fetch('/api/integrations/slack');
+        if (res.ok) {
+          const data = await res.json();
+          setSlackConnected(data.connected);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchSlackStatus();
+  }, []);
 
   const syncGithub = async () => {
     setSyncing(true);
@@ -94,6 +109,46 @@ export default function Integrations() {
       setLinkError(err instanceof Error ? err.message : 'GitHub 저장소 연동에 실패했습니다.');
     } finally {
       setLinking(false);
+    }
+  };
+
+  const handleSlackLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!slackWebhookInput.trim()) {
+      setSlackLinkError('Webhook URL을 입력해 주세요.');
+      return;
+    }
+    setSlackLinking(true);
+    setSlackLinkError('');
+    try {
+      const res = await fetch(`/api/integrations/slack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: slackWebhookInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Slack 연동에 실패했습니다.');
+      
+      setToast('Slack이 성공적으로 연동되었습니다.', 'success');
+      setShowSlackModal(false);
+      setSlackWebhookInput('');
+      setSlackConnected(true);
+    } catch (err) {
+      setSlackLinkError(err instanceof Error ? err.message : 'Slack 연동에 실패했습니다.');
+    } finally {
+      setSlackLinking(false);
+    }
+  };
+
+  const handleSlackUnlink = async () => {
+    if (!confirm('Slack 연동을 해제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/integrations/slack`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Slack 연동 해제에 실패했습니다.');
+      setToast('Slack 연동이 해제되었습니다.', 'info');
+      setSlackConnected(false);
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Slack 연동 해제에 실패했습니다.', 'error');
     }
   };
 
@@ -166,31 +221,102 @@ export default function Integrations() {
         </div>
       )}
 
+      {/* Slack Linking Modal */}
+      {showSlackModal && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden border border-gray-100">
+            <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus className="text-purple-600 w-5 h-5" />Slack 연동</h3>
+              <button onClick={() => setShowSlackModal(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
+            </div>
+            {isAdmin ? (
+              <form onSubmit={handleSlackLink} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Webhook URL *</label>
+                  <input 
+                    value={slackWebhookInput} 
+                    onChange={e => setSlackWebhookInput(e.target.value)} 
+                    placeholder="https://hooks.slack.com/services/..." 
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 bg-gray-50 focus:bg-white transition-all" 
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1.5">Slack에서 생성한 Incoming Webhook URL을 입력하세요.</p>
+                </div>
+                
+                {slackLinkError && <p className="text-[11px] text-red-600 mt-2">{slackLinkError}</p>}
+                
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setShowSlackModal(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                  <button type="submit" disabled={slackLinking || !slackWebhookInput.trim()} className="px-5 py-2.5 text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-60">
+                    {slackLinking ? '연동 중...' : '연동'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-6">
+                <p className="text-sm text-gray-600 mb-4">Slack 연동은 관리자(PM)만 가능합니다.</p>
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => setShowSlackModal(false)} className="px-5 py-2.5 text-sm font-bold bg-gray-900 hover:bg-black text-white rounded-lg transition-colors shadow-sm">닫기</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm shrink-0">
         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <Link2 className="text-blue-600 w-5 h-5" /> 외부 툴 연동 (Integrations)
         </h2>
-        <p className="text-gray-500 text-xs mt-0.5">GitHub는 프로젝트별로 연동합니다. 나머지는 아직 준비 중입니다.</p>
+        <p className="text-gray-500 text-xs mt-0.5">업무 효율을 높이는 외부 툴을 연동하세요.</p>
       </div>
 
       <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
-        {/* GitHub - 프로젝트별 연동으로 이동 대신 직접 모달 띄우기 */}
-        <button onClick={() => setShowLinkModal(true)} className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200">
-                <GithubIcon className="w-6 h-6 text-gray-800" />
+        <div className="grid grid-cols-2 gap-4">
+          {/* GitHub */}
+          <button onClick={() => setShowLinkModal(true)} className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200">
+                  <GithubIcon className="w-6 h-6 text-gray-800" />
+                </div>
+                <div>
+                  <div className="font-black text-gray-900">GitHub</div>
+                  <p className="text-sm text-gray-600 mt-0.5">저장소 주소만 입력하면 프로젝트별로 즉시 연동됩니다.</p>
+                </div>
               </div>
-              <div>
-                <div className="font-black text-gray-900">GitHub</div>
-                <p className="text-sm text-gray-600 mt-0.5">저장소 주소만 입력하면 프로젝트별로 즉시 연동됩니다. OAuth 앱 등록이나 서버 설정이 필요 없습니다.</p>
-              </div>
+              <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 group-hover:bg-blue-100 transition-colors">
+                연동하기 <ArrowRight className="w-3.5 h-3.5" />
+              </span>
             </div>
-            <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 group-hover:bg-blue-100 transition-colors">
-              프로젝트 선택 후 연동하기 <ArrowRight className="w-3.5 h-3.5" />
-            </span>
+          </button>
+
+          {/* Slack */}
+          <div className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-purple-50 border-purple-200">
+                  <MessageSquare className="w-6 h-6 text-purple-700" />
+                </div>
+                <div>
+                  <div className="font-black text-gray-900 flex items-center gap-2">
+                    Slack 
+                    {slackConnected && <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">연동됨</span>}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-0.5">배분 승인, 지연 감지, 완료 알림을 전송합니다.</p>
+                </div>
+              </div>
+              {slackConnected ? (
+                <button onClick={handleSlackUnlink} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" /> 연동 해제
+                </button>
+              ) : (
+                <button onClick={() => setShowSlackModal(true)} className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors">
+                  연동하기 <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-        </button>
+        </div>
 
         {/* GitHub PR 동기화 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex items-center justify-between">
@@ -209,37 +335,6 @@ export default function Integrations() {
           >
             {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> 동기화 중...</> : <><Zap className="w-4 h-4" /> 지금 동기화</>}
           </button>
-        </div>
-
-        {/* 나머지 - 준비 중 */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
-          <Construction className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
-            <strong>아래는 준비 중인 기능입니다.</strong> 실제 연동이 없는 상태에서 "연동됨"처럼 보이는 가짜 상태를 표시하지 않습니다.
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {PLANNED_INTEGRATIONS.map(integration => (
-            <div key={integration.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 opacity-80">
-              <div className="flex items-center gap-3 mb-3">
-                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border",
-                  integration.color === 'purple' ? "bg-purple-100 border-purple-200" :
-                  integration.color === 'blue' ? "bg-blue-100 border-blue-200" : "bg-green-100 border-green-200"
-                )}>
-                  <integration.icon className={cn("w-6 h-6",
-                    integration.color === 'purple' ? "text-purple-700" :
-                    integration.color === 'blue' ? "text-blue-700" : "text-green-700"
-                  )} />
-                </div>
-                <div>
-                  <div className="font-black text-gray-900">{integration.name}</div>
-                  <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">연동 예정</span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">{integration.desc}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>
