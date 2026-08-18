@@ -56,6 +56,17 @@ export default function Integrations() {
     }
   };
 
+  const handleProjectSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const pid = e.target.value;
+    setSelectedProjectId(pid);
+    const proj = projects.find(p => p.id === pid);
+    if (proj && proj.githubOwner && proj.githubRepo) {
+      setRepoUrlInput(`https://github.com/${proj.githubOwner}/${proj.githubRepo}`);
+    } else {
+      setRepoUrlInput('');
+    }
+  };
+
   const handleLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProjectId || !repoUrlInput.trim()) {
@@ -102,7 +113,7 @@ export default function Integrations() {
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">대상 프로젝트 *</label>
                   <select 
                     value={selectedProjectId} 
-                    onChange={e => setSelectedProjectId(e.target.value)} 
+                    onChange={handleProjectSelect} 
                     className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all"
                   >
                     <option value="" disabled>프로젝트를 선택하세요</option>
