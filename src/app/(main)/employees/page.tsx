@@ -20,6 +20,7 @@ const STATUS_META: Record<EmployeeStatus, { label: string; color: string; icon: 
 interface FormState {
   name: string;
   emailLocal: string;
+  emailDomain: string;
   phone: string;
   department: string;
   position: string;
@@ -33,7 +34,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  name: '', emailLocal: '', phone: '', department: '', position: '', role: '',
+  name: '', emailLocal: '', emailDomain: 'heyzzabi.com', phone: '', department: '', position: '', role: '',
   level: 'member', status: 'ACTIVE', hireDate: '', skills: [], certifications: [], pastProjects: [],
 };
 
@@ -88,6 +89,7 @@ export default function Employees() {
     setForm({
       name: emp.name,
       emailLocal: splitEmail(emp.email).local,
+      emailDomain: splitEmail(emp.email).domain,
       phone: emp.phone || '',
       department: emp.department,
       position: emp.position,
@@ -108,7 +110,7 @@ export default function Employees() {
 
     const payload = {
       name: form.name,
-      email: `${form.emailLocal}@${EMAIL_DOMAIN}`,
+      email: `${form.emailLocal}@${form.emailDomain}`,
       phone: form.phone || undefined,
       department: form.department,
       position: form.position,
@@ -160,8 +162,17 @@ export default function Employees() {
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">회사 이메일 *</label>
                   <div className="flex items-stretch border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 bg-gray-50 focus-within:bg-white">
                     <input required type="text" value={form.emailLocal} onChange={e => setForm(f => ({ ...f, emailLocal: e.target.value.replace(/[^a-zA-Z0-9._-]/g, '') }))}
-                      className="flex-1 min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
-                    <span className="flex items-center px-2.5 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@{EMAIL_DOMAIN}</span>
+                      className="flex-[4] min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
+                    <div className="flex items-center px-2 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@</div>
+                    <input required type="text" value={form.emailDomain} onChange={e => setForm(f => ({ ...f, emailDomain: e.target.value }))}
+                      className="flex-[6] min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="gmail.com" list="email-domains" />
+                    <datalist id="email-domains">
+                      <option value="heyzzabi.com" />
+                      <option value="gmail.com" />
+                      <option value="naver.com" />
+                      <option value="kakao.com" />
+                      <option value="daum.net" />
+                    </datalist>
                   </div>
                 </div>
               </div>

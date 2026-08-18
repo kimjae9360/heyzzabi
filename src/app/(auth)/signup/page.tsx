@@ -8,7 +8,15 @@ import { DEPARTMENTS, POSITIONS, JOB_TITLES, EMAIL_DOMAIN } from '@/lib/employee
 
 export default function SignupPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', emailLocal: '', password: '', department: '', position: '', jobTitle: '' });
+  const [form, setForm] = useState({
+    name: '',
+    emailLocal: '',
+    emailDomain: 'heyzzabi.com',
+    password: '',
+    department: DEPARTMENTS[0] as string,
+    position: POSITIONS[0] as string,
+    jobTitle: JOB_TITLES[0] as string,
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,11 +25,11 @@ export default function SignupPage() {
     setIsLoading(true);
     setError('');
     try {
-      const { emailLocal, ...rest } = form;
+      const { emailLocal, emailDomain, ...rest } = form;
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...rest, email: `${emailLocal}@${EMAIL_DOMAIN}` }),
+        body: JSON.stringify({ ...rest, email: `${emailLocal}@${emailDomain}` }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -58,8 +66,17 @@ export default function SignupPage() {
           <label className="block text-[10px] font-bold text-gray-600 mb-1">회사 이메일 *</label>
           <div className="flex items-stretch border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 bg-gray-50 focus-within:bg-white">
             <input type="text" required value={form.emailLocal} onChange={e => setForm(f => ({ ...f, emailLocal: e.target.value.replace(/[^a-zA-Z0-9._-]/g, '') }))}
-              className="flex-1 min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
-            <span className="flex items-center px-2.5 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@{EMAIL_DOMAIN}</span>
+              className="flex-[4] min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="hong" />
+            <div className="flex items-center px-2 text-sm text-gray-400 bg-gray-100 border-l border-gray-300 shrink-0">@</div>
+            <input required type="text" value={form.emailDomain} onChange={e => setForm(f => ({ ...f, emailDomain: e.target.value }))}
+              className="flex-[6] min-w-0 p-2.5 text-sm outline-none bg-transparent" placeholder="gmail.com" list="signup-email-domains" />
+            <datalist id="signup-email-domains">
+              <option value="heyzzabi.com" />
+              <option value="gmail.com" />
+              <option value="naver.com" />
+              <option value="kakao.com" />
+              <option value="daum.net" />
+            </datalist>
           </div>
         </div>
         <div>
