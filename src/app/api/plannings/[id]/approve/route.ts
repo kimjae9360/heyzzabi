@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const tasks = await prisma.$transaction(async (tx) => {
       const approved = await tx.planning.updateMany({
-        where: { planning_id: id, status: 'DRAFT' },
+        where: { planning_id: id, status: { in: ['DRAFT', 'REVIEW'] } },
         data: { status: 'APPROVED', approved_by: user.user_id, approved_at: new Date() },
       });
 
