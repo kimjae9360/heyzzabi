@@ -745,7 +745,16 @@ export default function Pipeline() {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    {isDelayed ? (
+                    {isTodo ? (
+                      <>
+                        <button onClick={() => updateTaskStatus(t.id, 'PENDING_DISTRIBUTION')} className="flex-1 py-2 text-[11px] font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors flex items-center justify-center gap-1">
+                          배분 취소
+                        </button>
+                        <button onClick={() => updateTaskStatus(t.id, 'IN_PROGRESS')} className="flex-[2] py-2 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1">
+                          웹에서 직접 수락(시작)
+                        </button>
+                      </>
+                    ) : isDelayed ? (
                       <button onClick={() => handleReallocate(t)} className="w-full py-2 text-[12px] font-bold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1">
                         <BrainCircuit className="w-3.5 h-3.5" /> AI 재조정안 승인
                       </button>
