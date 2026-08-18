@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { Link2, GitPullRequest as GithubIcon, MessageSquare, Kanban, Calendar, Construction, ArrowRight, Zap, Loader2, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -19,8 +18,17 @@ interface SyncResult {
 }
 
 export default function Integrations() {
-  const { setToast, fetchData } = useAppStore();
+  const { setToast, fetchData, projects, currentUser } = useAppStore();
   const [syncing, setSyncing] = useState(false);
+  
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [repoUrlInput, setRepoUrlInput] = useState('');
+  const [tokenInput, setTokenInput] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
+  const isAdmin = currentUser?.level === 'pm';
 
   const syncGithub = async () => {
     setSyncing(true);
@@ -30,7 +38,7 @@ export default function Integrations() {
       if (!res.ok) throw new Error(data.error || 'GitHub 동기화에 실패했습니다.');
 
       if (data.checkedProjects === 0) {
-        setToast('GitHub가 연동된 프로젝트가 없습니다. 업무관리에서 프로젝트를 먼저 연동해 주세요.', 'warning');
+        setToast('GitHub가 연동된 프로젝트가 없습니다. 연동하기 버튼을 눌러 프로젝트를 먼저 연동해 주세요.', 'warning');
       } else if (data.completed.length > 0) {
         const first = data.completed[0];
         const rest = data.completed.length - 1;
@@ -48,8 +56,105 @@ export default function Integrations() {
     }
   };
 
+  const handleLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjectId || !repoUrlInput.trim()) {
+      setLinkError('프로젝트를 선택하고 저장소 주소를 입력해 주세요.');
+      return;
+    }
+    setLinking(true);
+    setLinkError('');
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/github`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoUrl: repoUrlInput.trim(), token: tokenInput.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'GitHub 저장소 연동에 실패했습니다.');
+      
+      setToast('GitHub 저장소가 성공적으로 연동되었습니다.', 'success');
+      setShowLinkModal(false);
+      setRepoUrlInput('');
+      setTokenInput('');
+      setSelectedProjectId('');
+      await fetchData();
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'GitHub 저장소 연동에 실패했습니다.');
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#f4f5f7] overflow-y-auto">
+      {/* GitHub Linking Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] overflow-hidden border border-gray-100">
+            <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2"><Plus className="text-blue-600 w-5 h-5" />프로젝트에 GitHub 연동</h3>
+              <button onClick={() => setShowLinkModal(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
+            </div>
+            {isAdmin ? (
+              <form onSubmit={handleLink} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">대상 프로젝트 *</label>
+                  <select 
+                    value={selectedProjectId} 
+                    onChange={e => setSelectedProjectId(e.target.value)} 
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all"
+                  >
+                    <option value="" disabled>프로젝트를 선택하세요</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title} {p.githubOwner ? '(이미 연동됨)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">저장소 주소 *</label>
+                  <input 
+                    value={repoUrlInput} 
+                    onChange={e => setRepoUrlInput(e.target.value)} 
+                    placeholder="https://github.com/owner/repo" 
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Personal Access Token (선택)</label>
+                  <input 
+                    value={tokenInput} 
+                    onChange={e => setTokenInput(e.target.value)} 
+                    type="password" 
+                    placeholder="비공개 저장소일 때만 입력" 
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-all" 
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1.5">공개 저장소는 주소만 입력하면 됩니다. OAuth 앱 등록이나 서버 설정이 필요 없습니다.</p>
+                </div>
+                
+                {linkError && <p className="text-[11px] text-red-600 mt-2">{linkError}</p>}
+                
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setShowLinkModal(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">취소</button>
+                  <button type="submit" disabled={linking || !selectedProjectId || !repoUrlInput.trim()} className="px-5 py-2.5 text-sm font-bold bg-gray-900 hover:bg-black text-white rounded-lg transition-colors shadow-sm disabled:opacity-60">
+                    {linking ? '연동 중...' : '연동'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-6">
+                <p className="text-sm text-gray-600 mb-4">GitHub 연동은 관리자(PM)만 가능합니다.</p>
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => setShowLinkModal(false)} className="px-5 py-2.5 text-sm font-bold bg-gray-900 hover:bg-black text-white rounded-lg transition-colors shadow-sm">닫기</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm shrink-0">
         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
           <Link2 className="text-blue-600 w-5 h-5" /> 외부 툴 연동 (Integrations)
@@ -58,8 +163,8 @@ export default function Integrations() {
       </div>
 
       <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
-        {/* GitHub - 프로젝트별 연동으로 이동 */}
-        <Link href="/pipeline" className="block bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all">
+        {/* GitHub - 프로젝트별 연동으로 이동 대신 직접 모달 띄우기 */}
+        <button onClick={() => setShowLinkModal(true)} className="block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-gray-100 border-gray-200">
@@ -70,11 +175,11 @@ export default function Integrations() {
                 <p className="text-sm text-gray-600 mt-0.5">저장소 주소만 입력하면 프로젝트별로 즉시 연동됩니다. OAuth 앱 등록이나 서버 설정이 필요 없습니다.</p>
               </div>
             </div>
-            <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-              업무관리에서 프로젝트 선택 후 연동하기 <ArrowRight className="w-3.5 h-3.5" />
+            <span className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 group-hover:bg-blue-100 transition-colors">
+              프로젝트 선택 후 연동하기 <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
-        </Link>
+        </button>
 
         {/* GitHub PR 동기화 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-6 py-5 flex items-center justify-between">
